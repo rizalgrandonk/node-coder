@@ -31,22 +31,22 @@ port.on("error", (err) => {
   connect();
 });
 
-let timer = new Date();
-parser.on("data", (data) => {
-  const currentDate = new Date();
+// let timer = new Date();
+// parser.on("data", (data) => {
+//   const currentDate = new Date();
 
-  const diff = currentDate.getTime() - timer.getTime();
-  if (diff > 10) {
-    console.log("Difference", `${diff} ms`);
-  }
-  timer = currentDate;
+//   const diff = currentDate.getTime() - timer.getTime();
+//   if (diff > 200) {
+//     console.log("Difference", `${diff} ms`);
+//   }
+//   timer = currentDate;
 
-  console.log("Serial Port Parser Says", {
-    source: data,
-    string: data.toString(),
-    length: data.length,
-  });
-});
+//   console.log("Serial Port Parser Says", {
+//     source: data,
+//     string: data.toString(),
+//     length: data.length,
+//   });
+// });
 
 const connectionSafe = parser.readable && port.writable;
 const serialPort = connectionSafe ? port : undefined;
@@ -69,6 +69,11 @@ async function writeAndResponse(
   return Promise.race([
     new Promise<string>((resolve, reject) => {
       function readHandler(data: any) {
+        console.log("Serial Port Parser Says", {
+          source: data,
+          string: data.toString(),
+          length: data.length,
+        });
         if (!validation) {
           serialParser?.off("data", readHandler);
           return resolve(data);
