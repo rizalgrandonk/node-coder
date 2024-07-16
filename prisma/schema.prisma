@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ad_user {
+  ad_user_id   Decimal @id @db.Decimal(10, 0)
+  ad_client_id Decimal @db.Decimal(10, 0)
+  ad_org_id    Decimal @db.Decimal(10, 0)
+  codekey      String  @db.VarChar(50)
+  name         String  @db.VarChar(255)
+  description  String? @db.VarChar(255)
+  password     String  @db.VarChar(50)
+  isactive     String  @default("Y") @db.Char(1)
+}
+
+model batch {
+  id             Int       @id(map: "amxc_batch_pkey") @default(autoincrement())
+  created        DateTime  @db.Timestamp(6)
+  sent           DateTime? @db.Timestamp(6)
+  sendconfirmed  DateTime? @db.Timestamp(6)
+  description    String?   @db.VarChar(255)
+  blockcodecount Int       @default(0)
+  qty            Int       @default(0)
+  endqueue       Int       @default(10)
+  printedqty     Int       @default(0)
+  batchno        String?   @db.VarChar(50)
+  printerlineid  Int       @default(0)
+  createdby      Decimal   @default(0) @db.Decimal(10, 0)
+  updated        DateTime  @default(now()) @db.Timestamp(6)
+  updatedby      Decimal   @default(0) @db.Decimal(10, 0)
+  productid      Int
+  isactive       Boolean?
+  nik            String?   @db.VarChar
+  triggercount   String?   @db.VarChar
+  goodreadcount  String?   @db.VarChar
+  noreadcount    String?   @db.VarChar
+  matchcount     String?   @db.VarChar
+  mismatchcount  String?   @db.VarChar
+}
+
+model codererrorlog {
+  id               Int       @id(map: "errorlog_pkey") @default(autoincrement())
+  created          DateTime? @db.Timestamp(6)
+  errormessage     String    @db.VarChar(255)
+  errortimestamp   DateTime? @db.Timestamp(6)
+  batchno          String?   @db.VarChar(50)
+  sendconfirmed    DateTime? @db.Timestamp(6)
+  batchid          Int?
+  markingprinterid Int?
+}
+
+model coderpersonel {
+  coderpersonel_id Decimal @id @db.Decimal(10, 0)
+  name             String  @db.VarChar(255)
+  nik              String  @db.VarChar(255)
+  isactive         Boolean @default(true)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model errorcode {
+  errorcode        String? @db.VarChar(10)
+  errorname        String? @db.VarChar(200)
+  errordescription String? @db.VarChar(200)
+
+  @@ignore
+}
+
+model product {
+  name            String    @db.VarChar(255)
+  received        DateTime? @db.Timestamp(6)
+  description     String?   @db.VarChar(255)
+  upc             String?   @db.VarChar(30)
+  maxbuffer       Int       @default(0)
+  localminlevel   Int       @default(0)
+  localmaxlevel   Int       @default(1000000)
+  codekey         String    @db.VarChar(45)
+  endqueue        Int?
+  availableqty    Int       @default(0)
+  isactive        Boolean   @default(true)
+  id              Int       @id @default(autoincrement())
+  cardboardwidth  Decimal?  @db.Decimal
+  cardboardlength Decimal?  @db.Decimal
+  widthallowance  Decimal?  @db.Decimal
+
+  uniquecodes     uniquecode[]
+}
+
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+model uniquecode {
+  productid        Int?
+  uniquecode       String    @unique(map: "_idxuniquecode") @default("") @db.VarChar(15)
+  printed          DateTime? @db.Timestamp(6)
+  received         DateTime  @default(now()) @db.Timestamp(6)
+  batchid          Int?
+  sent             DateTime? @db.Timestamp(6)
+  sendconfirmed    DateTime? @db.Timestamp(6)
+  buffered         DateTime? @db.Timestamp(6)
+  printerlineid    Int?
+  markingprinterid Int?
+  id               Int       @id(map: "UniqueCode_Key") @default(autoincrement())
+  isactive         Boolean   @default(true)
+  coderstatus      String?   @db.VarChar(10)
+
+  product          product?   @relation(fields: [productid], references: [id])
+
+  @@index([buffered, productid, markingprinterid], map: "uniquecode_idx")
+}
