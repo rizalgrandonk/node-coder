@@ -48,10 +48,6 @@ port.on("error", (err) => {
 //   });
 // });
 
-const connectionSafe = parser.readable && port.writable;
-const serialPort = connectionSafe ? port : undefined;
-const serialParser = connectionSafe ? parser : undefined;
-
 async function writeAndResponse(
   data: string,
   config?: {
@@ -59,7 +55,7 @@ async function writeAndResponse(
     timeout?: number;
   }
 ) {
-  if (!serialPort || !serialParser) {
+  if (!port || !parser) {
     console.log("Serial Port Unavailable");
     return undefined;
   }
@@ -75,27 +71,27 @@ async function writeAndResponse(
           length: data.length,
         });
         if (!validation) {
-          serialParser?.off("data", readHandler);
+          parser?.off("data", readHandler);
           return resolve(data);
         }
         if (typeof validation === "string") {
           if (data.includes(validation)) {
-            serialParser?.off("data", readHandler);
+            parser?.off("data", readHandler);
             return resolve(data);
           }
           return;
         }
         if (validation(data)) {
-          serialParser?.off("data", readHandler);
+          parser?.off("data", readHandler);
           return resolve(data);
         }
       }
-      serialPort.drain((err) => {
+      port.drain((err) => {
         if (err) {
           console.log("Error drain", err);
           return reject(err);
         }
-        serialPort.write(data, (err) => {
+        port.write(data, (err) => {
           if (err) {
             console.log("Error write response", err);
             return reject(err);
@@ -103,12 +99,12 @@ async function writeAndResponse(
           console.log("Write to Serial", data);
         });
       });
-      serialPort.drain((err) => {
+      port.drain((err) => {
         if (err) {
           console.log("Error drain", err);
           return reject(err);
         }
-        serialParser.on("data", readHandler);
+        parser.on("data", readHandler);
       });
     }),
     new Promise<string>((_, reject) =>
@@ -144,16 +140,10 @@ async function waitDrain() {
   });
 }
 
-export type SerialConnection = {
-  serialPort: typeof serialPort;
-  serialParser: typeof serialParser;
-  writeAndResponse: typeof writeAndResponse;
-};
-
 export default {
   connect,
-  serialPort,
-  serialParser,
+  port,
+  parser,
   writeAndResponse,
   waitDataAndDrain,
   waitDrain,

@@ -9,12 +9,6 @@ const mainRoutes = express.Router();
 mainRoutes.get("/send-serial/:message", async (req, res) => {
   try {
     const message = req.params.message ?? "TEST";
-    if (!SerialConnection.serialPort) {
-      return res.status(400).json({
-        message: "Failed",
-        error: "Serial Port Disconnected",
-      });
-    }
     const response = await SerialConnection.writeAndResponse(message, {
       responseValidation: (res) => res.includes(message),
     });

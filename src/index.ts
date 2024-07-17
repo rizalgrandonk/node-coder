@@ -13,16 +13,36 @@ import SocketConnection from "./connections/socket";
 
 import express from "express";
 import mainRoutes from "./routes";
+import path from "path";
+import { Worker } from "worker_threads";
+import { fork } from "child_process";
+
+const serialWorker = fork(path.resolve(__dirname, "./serialProcess"));
 
 const UniquecodeEvent = new EventEmitter();
 
 const startUniquecodeTransaction = async () => {
-  await SerialConnection.connect();
-  await SerialConnection.waitDataAndDrain();
+  // await SerialConnection.connect();
+  // await SerialConnection.waitDataAndDrain();
+  await new Promise((resolve) => {
+    serialWorker.on("message", (message) => {
+      console.log(message);
+      if (message !== "INIT") {
+        return;
+      }
+      resolve(message);
+    });
+    serialWorker.on("error", (err) => {
+      console.log(err);
+      resolve(false);
+    });
+
+    serialWorker.send("INIT");
+  });
 
   const dateBefore = new Date();
 
-  const resultUniquecodes = await getUniquecodes(20);
+  const resultUniquecodes = await getUniquecodes(3);
   if (!resultUniquecodes) {
     console.log("Failed to get uniquecodes");
     return;
@@ -64,19 +84,38 @@ const startUniquecodeTransaction = async () => {
 };
 
 async function serialHandler(uniquecodes: string[]) {
-  const serialWorker = await spawn<SerialProcess>(
-    new ThreadWorker("./serialProcess")
-  );
+  // const serialWorker = await spawn<SerialProcess>(
+  //   new ThreadWorker("./serialProcess")
+  // );
+
   while (uniquecodes.length > 0) {
     const selected = uniquecodes[0];
-    const result = await serialProcess(selected);
+    // const result = await serialProcess(selected);
     // const result = await serialWorker(selected);
+
+    const result = await new Promise((resolve) => {
+      serialWorker.on("message", (message) => {
+        console.log(message);
+        if (message !== selected) {
+          return;
+        }
+        resolve(true);
+      });
+      serialWorker.on("error", (err) => {
+        console.log(err);
+        resolve(false);
+      });
+
+      serialWorker.send(selected);
+    });
 
     console.log("Result Serial", { result, selected });
     if (result) {
       uniquecodes.shift();
     }
   }
+
+  serialWorker.kill();
 
   UniquecodeEvent.emit("serialcomplete");
 }
