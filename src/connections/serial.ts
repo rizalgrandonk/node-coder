@@ -11,25 +11,41 @@ const parser = new ReadlineParser({
 });
 port.pipe(parser);
 
-async function connect() {
-  console.log("ConnectRun");
-  return await new Promise<void>((resolve, reject) => {
-    port.open((err) => {
-      if (err) {
-        console.log("Serial Port Connection Error", err);
-        return reject(err);
-      }
+let intervalConnect: NodeJS.Timeout | undefined = undefined;
 
-      console.log("connected to server", "Serial Port");
-      resolve();
-    });
+function connect() {
+  console.log("ConnecRun");
+  port.open((err) => {
+    if (err) {
+      console.log(err, "Serial ERROR");
+      launchIntervalConnect();
+      return;
+    }
+
+    clearIntervalConnect();
+    console.log("connected to server", "Serial");
   });
 }
 
+function launchIntervalConnect() {
+  if (!!intervalConnect) return;
+  intervalConnect = setInterval(connect, 3000);
+}
+
+function clearIntervalConnect() {
+  if (!intervalConnect) return;
+  clearInterval(intervalConnect);
+  intervalConnect = undefined;
+}
+
 port.on("error", (err) => {
-  console.log("Serial Port Connection Error", err);
-  connect();
+  console.log(err, "Serial ERROR");
+  launchIntervalConnect();
 });
+port.on("close", launchIntervalConnect);
+port.on("end", launchIntervalConnect);
+
+connect();
 
 // let timer = new Date();
 // parser.on("data", (data) => {
@@ -62,7 +78,7 @@ async function writeAndResponse(
   const waitTimeout = config?.timeout ?? 5000;
   const validation = config?.responseValidation;
 
-  return Promise.race([
+  return await Promise.race([
     new Promise<string>((resolve, reject) => {
       const readHandler = (data: any) => {
         console.log("Serial Port Parser Says", {
@@ -97,14 +113,14 @@ async function writeAndResponse(
             return reject(err);
           }
           console.log("Write to Serial", data);
+          port.drain((err) => {
+            if (err) {
+              console.log("Error drain", err);
+              return reject(err);
+            }
+            parser.on("data", readHandler);
+          });
         });
-      });
-      port.drain((err) => {
-        if (err) {
-          console.log("Error drain", err);
-          return reject(err);
-        }
-        parser.on("data", readHandler);
       });
     }),
     new Promise<string>((_, reject) =>
@@ -140,6 +156,35 @@ async function waitDrain() {
   });
 }
 
+async function waitSendData(timeout: number = 3000) {
+  return await Promise.race([
+    new Promise((resolve) => {
+      port.drain((err) => {
+        if (err) {
+          console.log("Error drain", err);
+          return resolve(err);
+        }
+        port.write("TEST", (err) => {
+          if (err) {
+            console.log("Error write response", err);
+            return resolve(err);
+          }
+          port.drain((err) => {
+            if (err) {
+              console.log("Error drain", err);
+              return resolve(err);
+            }
+            parser.once("data", (data) => {
+              resolve(data);
+            });
+          });
+        });
+      });
+    }),
+    new Promise<string>((resolve) => setTimeout(resolve, timeout)),
+  ]);
+}
+
 export default {
   connect,
   port,
@@ -147,4 +192,5 @@ export default {
   writeAndResponse,
   waitDataAndDrain,
   waitDrain,
+  waitSendData,
 };

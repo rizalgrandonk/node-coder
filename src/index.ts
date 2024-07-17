@@ -1,29 +1,20 @@
 import "dotenv/config";
 import "./db";
-import "./connections";
 import { getUniquecodes } from "./actions/uniquecodes";
-import { spawn, Worker as ThreadWorker, Pool, Thread } from "threads";
-import type { SocketWorker } from "./socketProcess";
-import SerialConnection from "./connections/serial";
 import EventEmitter from "events";
-import { serialProcess } from "./actions/serial";
-import { sleep } from "./utils/sleep";
-import { SerialProcess } from "./serialProcess";
-import SocketConnection from "./connections/socket";
 
-import express from "express";
-import mainRoutes from "./routes";
-import path from "path";
-import { Worker } from "worker_threads";
+import { spawn, Worker as ThreadWorker, Thread } from "threads";
+import type { SocketProcess } from "./socketProcess";
 import { fork } from "child_process";
+import path from "path";
 
-// const serialWorker = fork(path.resolve(__dirname, "./serialProcess"));
+const serialWorker = fork(path.resolve(__dirname, "./serialProcess"));
 
 const UniquecodeEvent = new EventEmitter();
 
 const startUniquecodeTransaction = async () => {
-  await SerialConnection.connect();
-  await SerialConnection.waitDataAndDrain();
+  // await SerialConnection.waitDrain();
+  // await SerialConnection.waitSendData();
   // await new Promise((resolve) => {
   //   serialWorker.on("message", (message) => {
   //     console.log(message);
@@ -40,9 +31,10 @@ const startUniquecodeTransaction = async () => {
   //   serialWorker.send("INIT");
   // });
 
+  console.log("START");
   const dateBefore = new Date();
 
-  const resultUniquecodes = await getUniquecodes(5);
+  const resultUniquecodes = await getUniquecodes(20);
   if (!resultUniquecodes) {
     console.log("Failed to get uniquecodes");
     return;
@@ -92,24 +84,26 @@ async function serialHandler(uniquecodes: string[]) {
 
   while (uniquecodes.length > 0) {
     const selected = uniquecodes[0];
-    const result = await serialProcess(selected);
+    // const result = await serialProcess(selected);
     // const result = await serialWorker(selected);
 
-    // const result = await new Promise((resolve) => {
-    //   serialWorker.on("message", (message) => {
-    //     console.log(message);
-    //     if (message !== selected) {
-    //       return;
-    //     }
-    //     resolve(true);
-    //   });
-    //   serialWorker.on("error", (err) => {
-    //     console.log(err);
-    //     resolve(false);
-    //   });
+    const result = await new Promise((resolve) => {
+      serialWorker.send(selected);
 
-    //   serialWorker.send(selected);
-    // });
+      const messageHandler = (message: string | null) => {
+        serialWorker.off("message", messageHandler);
+        serialWorker.off("error", errorHandler);
+        resolve(message === selected);
+      };
+      const errorHandler = (err: Error) => {
+        console.log(err);
+        serialWorker.off("error", errorHandler);
+        serialWorker.off("message", messageHandler);
+        resolve(false);
+      };
+      serialWorker.on("message", messageHandler);
+      serialWorker.on("error", errorHandler);
+    });
 
     console.log("Result Serial", { result, selected });
     if (result) {
@@ -117,35 +111,28 @@ async function serialHandler(uniquecodes: string[]) {
     }
   }
 
-  // serialWorker.kill();
+  serialWorker.kill();
 
   UniquecodeEvent.emit("serialcomplete");
 }
 async function socketHandler(uniquecodes: string[]) {
-  const socketWorker = await spawn<SocketWorker>(
+  const socketProcess = await spawn<SocketProcess>(
     new ThreadWorker("./socketProcess")
   );
-  socketWorker.observe().subscribe(
-    ({ result, selected }) => {
-      console.log({ uniquecodes });
-      if (result) {
-        const index = uniquecodes.indexOf(selected);
-        if (index > -1) {
-          uniquecodes.splice(index, 1);
-        }
-      }
-    },
-    (err) => {
-      console.log(err);
-    },
-    async () => {
-      await Thread.terminate(socketWorker);
 
-      UniquecodeEvent.emit("socketcomplete");
+  while (uniquecodes.length > 0) {
+    const selected = uniquecodes[0];
+    const result = await socketProcess(selected);
+    console.log({ result });
+
+    if (result) {
+      uniquecodes.shift();
     }
-  );
-  await socketWorker.add(uniquecodes);
-  socketWorker.run();
+  }
+
+  await Thread.terminate(socketProcess);
+
+  UniquecodeEvent.emit("socketcomplete");
 }
 
 startUniquecodeTransaction();
