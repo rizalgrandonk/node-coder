@@ -16,15 +16,19 @@ export type SerialProcess = typeof serialProcess;
 
 // expose(serialProcess);
 process.on("message", async (message) => {
-  console.log({ message });
-  if (typeof message !== "string") {
-    return;
+  try {
+    console.log({ message });
+    if (typeof message !== "string") {
+      return;
+    }
+    if (message === "INIT") {
+      await SerialConnection.writeAndResponse(message, { timeout: 2000 });
+      process.send && process.send(message);
+      return;
+    }
+    const result = await serialProcess(message);
+    process.send && process.send(result ? message : null);
+  } catch (error) {
+    process.send && process.send(null);
   }
-  // if (message === "INIT") {
-  //   await SerialConnection.waitDataAndDrain();
-  //   process.send && process.send(message);
-  //   return;
-  // }
-  const result = await serialProcess(message);
-  process.send && process.send(result ? message : null);
 });

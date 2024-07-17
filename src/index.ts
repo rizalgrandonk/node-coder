@@ -13,28 +13,12 @@ const serialWorker = fork(path.resolve(__dirname, "./serialProcess"));
 const UniquecodeEvent = new EventEmitter();
 
 const startUniquecodeTransaction = async () => {
-  // await SerialConnection.waitDrain();
-  // await SerialConnection.waitSendData();
-  // await new Promise((resolve) => {
-  //   serialWorker.on("message", (message) => {
-  //     console.log(message);
-  //     if (message !== "INIT") {
-  //       return;
-  //     }
-  //     resolve(message);
-  //   });
-  //   serialWorker.on("error", (err) => {
-  //     console.log(err);
-  //     resolve(false);
-  //   });
-
-  //   serialWorker.send("INIT");
-  // });
+  await initiateSerial();
 
   console.log("START");
-  const dateBefore = new Date();
+  const timeBefore = performance.now();
 
-  const resultUniquecodes = await getUniquecodes(20);
+  const resultUniquecodes = await getUniquecodes(5);
   if (!resultUniquecodes) {
     console.log("Failed to get uniquecodes");
     return;
@@ -48,9 +32,9 @@ const startUniquecodeTransaction = async () => {
 
   serialHandler(serialBuffer).catch(console.error);
 
-  UniquecodeEvent.on("serialcomplete", () => {
-    const dateAfter = new Date();
-    const timeDiff = dateAfter.getTime() - dateBefore.getTime();
+  const onCompleteHandler = () => {
+    const timeAffter = performance.now();
+    const timeDiff = timeAffter - timeBefore;
     console.log(`Serial process complete in ${timeDiff} ms`);
     console.log({ serialBuffer, socketBuffer });
 
@@ -60,21 +44,11 @@ const startUniquecodeTransaction = async () => {
       );
       process.exit(0);
     }
-  });
+  };
 
-  UniquecodeEvent.on("socketcomplete", () => {
-    const dateAfter = new Date();
-    const timeDiff = dateAfter.getTime() - dateBefore.getTime();
-    console.log(`Socket process complete in ${timeDiff} ms`);
-    console.log({ serialBuffer, socketBuffer });
+  UniquecodeEvent.on("serialcomplete", onCompleteHandler);
 
-    if (serialBuffer.length <= 0 && socketBuffer.length <= 0) {
-      console.log(
-        `Finished processing ${uniquecodes.length} uniquecodes in ${timeDiff} ms`
-      );
-      process.exit(0);
-    }
-  });
+  UniquecodeEvent.on("socketcomplete", onCompleteHandler);
 };
 
 async function serialHandler(uniquecodes: string[]) {
@@ -133,6 +107,26 @@ async function socketHandler(uniquecodes: string[]) {
   await Thread.terminate(socketProcess);
 
   UniquecodeEvent.emit("socketcomplete");
+}
+
+async function initiateSerial() {
+  await new Promise((resolve) => {
+    serialWorker.send("INIT");
+
+    const messageHandler = (message: string | null) => {
+      serialWorker.off("message", messageHandler);
+      serialWorker.off("error", errorHandler);
+      resolve(message === "INIT");
+    };
+    const errorHandler = (err: Error) => {
+      console.log(err);
+      serialWorker.off("error", errorHandler);
+      serialWorker.off("message", messageHandler);
+      resolve(false);
+    };
+    serialWorker.on("message", messageHandler);
+    serialWorker.on("error", errorHandler);
+  });
 }
 
 startUniquecodeTransaction();
