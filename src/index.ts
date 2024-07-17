@@ -3,7 +3,7 @@ import "./db";
 import "./connections";
 import { getUniquecodes } from "./actions/uniquecodes";
 import { spawn, Worker as ThreadWorker, Pool, Thread } from "threads";
-import type { SocketProcess } from "./socketProcess";
+import type { SocketWorker } from "./socketProcess";
 import SerialConnection from "./connections/serial";
 import EventEmitter from "events";
 import { serialProcess } from "./actions/serial";
@@ -17,32 +17,32 @@ import path from "path";
 import { Worker } from "worker_threads";
 import { fork } from "child_process";
 
-const serialWorker = fork(path.resolve(__dirname, "./serialProcess"));
+// const serialWorker = fork(path.resolve(__dirname, "./serialProcess"));
 
 const UniquecodeEvent = new EventEmitter();
 
 const startUniquecodeTransaction = async () => {
-  // await SerialConnection.connect();
-  // await SerialConnection.waitDataAndDrain();
-  await new Promise((resolve) => {
-    serialWorker.on("message", (message) => {
-      console.log(message);
-      if (message !== "INIT") {
-        return;
-      }
-      resolve(message);
-    });
-    serialWorker.on("error", (err) => {
-      console.log(err);
-      resolve(false);
-    });
+  await SerialConnection.connect();
+  await SerialConnection.waitDataAndDrain();
+  // await new Promise((resolve) => {
+  //   serialWorker.on("message", (message) => {
+  //     console.log(message);
+  //     if (message !== "INIT") {
+  //       return;
+  //     }
+  //     resolve(message);
+  //   });
+  //   serialWorker.on("error", (err) => {
+  //     console.log(err);
+  //     resolve(false);
+  //   });
 
-    serialWorker.send("INIT");
-  });
+  //   serialWorker.send("INIT");
+  // });
 
   const dateBefore = new Date();
 
-  const resultUniquecodes = await getUniquecodes(3);
+  const resultUniquecodes = await getUniquecodes(5);
   if (!resultUniquecodes) {
     console.log("Failed to get uniquecodes");
     return;
@@ -60,6 +60,7 @@ const startUniquecodeTransaction = async () => {
     const dateAfter = new Date();
     const timeDiff = dateAfter.getTime() - dateBefore.getTime();
     console.log(`Serial process complete in ${timeDiff} ms`);
+    console.log({ serialBuffer, socketBuffer });
 
     if (serialBuffer.length <= 0 && socketBuffer.length <= 0) {
       console.log(
@@ -73,6 +74,7 @@ const startUniquecodeTransaction = async () => {
     const dateAfter = new Date();
     const timeDiff = dateAfter.getTime() - dateBefore.getTime();
     console.log(`Socket process complete in ${timeDiff} ms`);
+    console.log({ serialBuffer, socketBuffer });
 
     if (serialBuffer.length <= 0 && socketBuffer.length <= 0) {
       console.log(
@@ -90,24 +92,24 @@ async function serialHandler(uniquecodes: string[]) {
 
   while (uniquecodes.length > 0) {
     const selected = uniquecodes[0];
-    // const result = await serialProcess(selected);
+    const result = await serialProcess(selected);
     // const result = await serialWorker(selected);
 
-    const result = await new Promise((resolve) => {
-      serialWorker.on("message", (message) => {
-        console.log(message);
-        if (message !== selected) {
-          return;
-        }
-        resolve(true);
-      });
-      serialWorker.on("error", (err) => {
-        console.log(err);
-        resolve(false);
-      });
+    // const result = await new Promise((resolve) => {
+    //   serialWorker.on("message", (message) => {
+    //     console.log(message);
+    //     if (message !== selected) {
+    //       return;
+    //     }
+    //     resolve(true);
+    //   });
+    //   serialWorker.on("error", (err) => {
+    //     console.log(err);
+    //     resolve(false);
+    //   });
 
-      serialWorker.send(selected);
-    });
+    //   serialWorker.send(selected);
+    // });
 
     console.log("Result Serial", { result, selected });
     if (result) {
@@ -115,27 +117,35 @@ async function serialHandler(uniquecodes: string[]) {
     }
   }
 
-  serialWorker.kill();
+  // serialWorker.kill();
 
   UniquecodeEvent.emit("serialcomplete");
 }
 async function socketHandler(uniquecodes: string[]) {
-  const socketWorker = await spawn<SocketProcess>(
+  const socketWorker = await spawn<SocketWorker>(
     new ThreadWorker("./socketProcess")
   );
-  while (uniquecodes.length > 0) {
-    const selected = uniquecodes[0];
-    const result = await socketWorker(selected);
+  socketWorker.observe().subscribe(
+    ({ result, selected }) => {
+      console.log({ uniquecodes });
+      if (result) {
+        const index = uniquecodes.indexOf(selected);
+        if (index > -1) {
+          uniquecodes.splice(index, 1);
+        }
+      }
+    },
+    (err) => {
+      console.log(err);
+    },
+    async () => {
+      await Thread.terminate(socketWorker);
 
-    console.log("Result Socket", { result, selected });
-    if (result) {
-      uniquecodes.shift();
+      UniquecodeEvent.emit("socketcomplete");
     }
-  }
-
-  await Thread.terminate(socketWorker);
-
-  UniquecodeEvent.emit("socketcomplete");
+  );
+  await socketWorker.add(uniquecodes);
+  socketWorker.run();
 }
 
 startUniquecodeTransaction();

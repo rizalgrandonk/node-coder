@@ -34,14 +34,6 @@ client.on("error", (err) => {
 client.on("close", launchIntervalConnect);
 client.on("end", launchIntervalConnect);
 
-client.on("data", (data) => {
-  console.log("TCP Says", {
-    source: data,
-    string: data.toString(),
-    length: data.length,
-  });
-});
-
 connect();
 
 export const socketClient =
@@ -54,7 +46,7 @@ export async function writeAndResponse(
     timeout?: number;
   }
 ) {
-  if (!socketClient) {
+  if (!client) {
     console.log("Serial Port Unavailable");
     return undefined;
   }
@@ -63,23 +55,32 @@ export async function writeAndResponse(
 
   return Promise.race([
     new Promise<string>((resolve) => {
-      socketClient.write(data);
-
-      socketClient.on("data", (data) => {
-        const result = data.toString().trim();
+      const readHandler = (data: any) => {
+        console.log("TCP Says", {
+          source: data,
+          string: data.toString(),
+          length: data.length,
+        });
         if (!validation) {
-          return resolve(result);
+          client?.off("data", readHandler);
+          return resolve(data);
         }
         if (typeof validation === "string") {
-          if (result.includes(validation)) {
-            return resolve(result);
+          if (data.includes(validation)) {
+            client?.off("data", readHandler);
+            return resolve(data);
           }
           return;
         }
-        if (validation(result)) {
-          return resolve(result);
+        if (validation(data)) {
+          client?.off("data", readHandler);
+          return resolve(data);
         }
-      });
+      };
+
+      client.write(data);
+
+      client.on("data", readHandler);
     }),
     new Promise<string>((_, reject) =>
       setTimeout(

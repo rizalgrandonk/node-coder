@@ -64,7 +64,7 @@ async function writeAndResponse(
 
   return Promise.race([
     new Promise<string>((resolve, reject) => {
-      function readHandler(data: any) {
+      const readHandler = (data: any) => {
         console.log("Serial Port Parser Says", {
           source: data,
           string: data.toString(),
@@ -85,7 +85,7 @@ async function writeAndResponse(
           parser?.off("data", readHandler);
           return resolve(data);
         }
-      }
+      };
       port.drain((err) => {
         if (err) {
           console.log("Error drain", err);
