@@ -1,3 +1,4 @@
+import "dotenv/config";
 import "./connections/socket";
 import { expose } from "threads/worker";
 import * as SocketAction from "./actions/socket";

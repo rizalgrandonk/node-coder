@@ -1,8 +1,9 @@
 import net from "net";
 
-const TCP_PORT = 515;
-const TCP_HOST = "0.0.0.0";
-const configTCP = { port: TCP_PORT, host: TCP_HOST };
+const configTCP = {
+  port: +(process.env.SOCKET_PORT ?? 515),
+  host: process.env.SOCKET_HOST ?? "0.0.0.0",
+};
 
 const client = new net.Socket();
 let intervalConnect: NodeJS.Timeout | undefined = undefined;

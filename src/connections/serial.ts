@@ -2,12 +2,12 @@ import { SerialPort } from "serialport";
 import { ReadlineParser } from "@serialport/parser-readline";
 
 const port = new SerialPort({
-  path: "/dev/cu.usbmodem1401",
-  baudRate: 115200,
+  path: process.env.SERIAL_NAME ?? "/dev/cu.usbmodem1401",
+  baudRate: +(process.env.SERIAL_BAUD_RATE ?? 115200),
   autoOpen: false,
 });
 const parser = new ReadlineParser({
-  delimiter: "\r\n",
+  delimiter: process.env.SERIAL_DELIMITER ?? "\r\n",
 });
 port.pipe(parser);
 

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import "./connections/serial";
 // import { expose } from "threads/worker";
 import * as SerialAction from "./actions/serial";
