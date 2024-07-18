@@ -5,15 +5,18 @@ import EventEmitter from "events";
 
 import { spawn, Worker as ThreadWorker, Thread } from "threads";
 import type { SocketProcess } from "./socketProcess";
-import { fork } from "child_process";
+import type { SerialProcess } from "./serialProcess";
 import path from "path";
+import ChildWorker from "./utils/childProcess";
 
-const serialWorker = fork(path.resolve(__dirname, "./serialProcess"));
+const serialWorker = new ChildWorker<SerialProcess>(
+  path.resolve(__dirname, "./serialProcess")
+);
 
 const UniquecodeEvent = new EventEmitter();
 
 const startUniquecodeTransaction = async () => {
-  await initiateSerial();
+  await serialWorker.run("INIT");
 
   console.log("START");
   const timeBefore = performance.now();
@@ -61,23 +64,7 @@ async function serialHandler(uniquecodes: string[]) {
     // const result = await serialProcess(selected);
     // const result = await serialWorker(selected);
 
-    const result = await new Promise((resolve) => {
-      serialWorker.send(selected);
-
-      const messageHandler = (message: string | null) => {
-        serialWorker.off("message", messageHandler);
-        serialWorker.off("error", errorHandler);
-        resolve(message === selected);
-      };
-      const errorHandler = (err: Error) => {
-        console.log(err);
-        serialWorker.off("error", errorHandler);
-        serialWorker.off("message", messageHandler);
-        resolve(false);
-      };
-      serialWorker.on("message", messageHandler);
-      serialWorker.on("error", errorHandler);
-    });
+    const result = await serialWorker.run(selected);
 
     console.log("Result Serial", { result, selected });
     if (result) {
@@ -107,26 +94,6 @@ async function socketHandler(uniquecodes: string[]) {
   await Thread.terminate(socketProcess);
 
   UniquecodeEvent.emit("socketcomplete");
-}
-
-async function initiateSerial() {
-  await new Promise((resolve) => {
-    serialWorker.send("INIT");
-
-    const messageHandler = (message: string | null) => {
-      serialWorker.off("message", messageHandler);
-      serialWorker.off("error", errorHandler);
-      resolve(message === "INIT");
-    };
-    const errorHandler = (err: Error) => {
-      console.log(err);
-      serialWorker.off("error", errorHandler);
-      serialWorker.off("message", messageHandler);
-      resolve(false);
-    };
-    serialWorker.on("message", messageHandler);
-    serialWorker.on("error", errorHandler);
-  });
 }
 
 startUniquecodeTransaction();
