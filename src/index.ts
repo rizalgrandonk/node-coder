@@ -4,18 +4,22 @@ import { getUniquecodes } from "./actions/uniquecodes";
 import EventEmitter from "events";
 
 import { spawn, Worker as ThreadWorker, Thread } from "threads";
-import type { SocketProcess } from "./socketProcess";
-import type { SerialProcess } from "./serialProcess";
+import type { SocketWorker } from "./socketProcess";
+import type { SerialWorker } from "./serialProcess";
 import path from "path";
 import ChildWorker from "./utils/childProcess";
 
-const serialWorker = new ChildWorker<SerialProcess>(
-  path.resolve(__dirname, "./serialProcess")
-);
+(async () => {
+  const serialWorker = new ChildWorker<SerialWorker>(
+    path.resolve(__dirname, "./serialProcess")
+  );
 
-const UniquecodeEvent = new EventEmitter();
+  const socketWorker = await spawn<SocketWorker>(
+    new ThreadWorker("./socketProcess")
+  );
 
-const startUniquecodeTransaction = async () => {
+  const UniquecodeEvent = new EventEmitter();
+
   await serialWorker.run("INIT");
 
   console.log("START");
@@ -52,51 +56,39 @@ const startUniquecodeTransaction = async () => {
   UniquecodeEvent.on("serialcomplete", onCompleteHandler);
 
   UniquecodeEvent.on("socketcomplete", onCompleteHandler);
-};
 
-async function serialHandler(uniquecodes: string[]) {
-  // const serialWorker = await spawn<SerialProcess>(
-  //   new ThreadWorker("./serialProcess")
-  // );
+  async function serialHandler(uniquecodes: string[]) {
+    while (uniquecodes.length > 0) {
+      const selected = uniquecodes[0];
 
-  while (uniquecodes.length > 0) {
-    const selected = uniquecodes[0];
-    // const result = await serialProcess(selected);
-    // const result = await serialWorker(selected);
+      const result = await serialWorker.run(selected);
 
-    const result = await serialWorker.run(selected);
-
-    console.log("Result Serial", { result, selected });
-    if (result) {
-      uniquecodes.shift();
+      console.log("Result Serial", { result, selected });
+      if (result) {
+        uniquecodes.shift();
+      }
     }
+
+    serialWorker.kill();
+
+    UniquecodeEvent.emit("serialcomplete");
   }
+  async function socketHandler(uniquecodes: string[]) {
+    while (uniquecodes.length > 0) {
+      const selected = uniquecodes[0];
+      const result = await socketWorker(selected);
+      console.log({ result });
 
-  serialWorker.kill();
-
-  UniquecodeEvent.emit("serialcomplete");
-}
-async function socketHandler(uniquecodes: string[]) {
-  const socketProcess = await spawn<SocketProcess>(
-    new ThreadWorker("./socketProcess")
-  );
-
-  while (uniquecodes.length > 0) {
-    const selected = uniquecodes[0];
-    const result = await socketProcess(selected);
-    console.log({ result });
-
-    if (result) {
-      uniquecodes.shift();
+      if (result) {
+        uniquecodes.shift();
+      }
     }
+
+    await Thread.terminate(socketWorker);
+
+    UniquecodeEvent.emit("socketcomplete");
   }
-
-  await Thread.terminate(socketProcess);
-
-  UniquecodeEvent.emit("socketcomplete");
-}
-
-startUniquecodeTransaction();
+})();
 
 // const app = express();
 // const port = 8585;

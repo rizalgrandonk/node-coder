@@ -2,7 +2,7 @@ import "./connections/socket";
 import { expose } from "threads/worker";
 import * as SocketAction from "./actions/socket";
 
-const socketProcess = async (uniquecode: string) => {
+const socketWorker = async (uniquecode: string) => {
   try {
     return await SocketAction.socketProcess(uniquecode);
   } catch (error: any) {
@@ -11,6 +11,6 @@ const socketProcess = async (uniquecode: string) => {
   }
 };
 
-export type SocketProcess = typeof socketProcess;
+export type SocketWorker = typeof socketWorker;
 
-expose(socketProcess);
+expose(socketWorker);

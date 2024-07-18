@@ -4,7 +4,7 @@ import * as SerialAction from "./actions/serial";
 import SerialConnection from "./connections/serial";
 import { expose } from "./utils/childProcess";
 
-const serialProcess = async (uniquecode: string) => {
+const serialWorker = async (uniquecode: string) => {
   try {
     if (uniquecode === "INIT") {
       await SerialConnection.writeAndResponse(uniquecode, { timeout: 1500 });
@@ -18,6 +18,6 @@ const serialProcess = async (uniquecode: string) => {
   }
 };
 
-export type SerialProcess = typeof serialProcess;
+export type SerialWorker = typeof serialWorker;
 
-expose(serialProcess);
+expose(serialWorker);
