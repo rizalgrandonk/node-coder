@@ -8,7 +8,7 @@ import { expose } from "./utils/childProcess";
 const serialWorker = async (uniquecode: string) => {
   try {
     if (uniquecode === "INIT") {
-      await SerialConnection.writeAndResponse(uniquecode, { timeout: 1500 });
+      await SerialConnection.waitSendData({ timeout: 1500 });
       return true;
     }
 

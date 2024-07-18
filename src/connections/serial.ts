@@ -156,7 +156,8 @@ async function waitDrain() {
   });
 }
 
-async function waitSendData(timeout: number = 3000) {
+async function waitSendData(config?: { timeout?: number }) {
+  const timeout = config?.timeout ?? 3000;
   return await Promise.race([
     new Promise((resolve) => {
       port.drain((err) => {
