@@ -15,7 +15,6 @@ const add = (codes: string[]) => {
 const observe = () => Observable.from(subject);
 const run = async () => {
   while (true) {
-    console.log("SOCKET", { uniquecodes: uniquecodes.length });
     if (uniquecodes.length > 0) {
       const selected = uniquecodes[0];
       const result = await SocketAction.socketProcess(selected);

@@ -60,6 +60,7 @@ import prisma from "./db";
       socketBuffer: socketBuffer.length,
       printedBuffer: printedBuffer.length,
       updatedBufer: updatedBufer.length,
+      toUpdate: toUpdate.length,
     });
 
     await prisma.uniquecode.updateMany({
@@ -75,6 +76,7 @@ import prisma from "./db";
     });
 
     if (updatedBufer.length >= GOALS_LENGTH) {
+      console.log("COMPLETE");
       await onCompleteHandler();
     }
 
