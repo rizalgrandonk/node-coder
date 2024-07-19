@@ -11,7 +11,8 @@ export const socketProcess = async (uniquecode: string) => {
       console.log("Failed request to socket connection");
       return false;
     }
-    const result = await updateSocketUniquecode(uniquecode, new Date());
+    // const result = await updateSocketUniquecode(uniquecode, new Date());
+    const result = 1;
     console.log(`Complete processing socket update ${uniquecode}`, result);
 
     if (result <= 0) {

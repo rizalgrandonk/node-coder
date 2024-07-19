@@ -57,11 +57,7 @@ export async function writeAndResponse(
   return Promise.race([
     new Promise<string>((resolve) => {
       const readHandler = (data: any) => {
-        console.log("TCP Says", {
-          source: data,
-          string: data.toString(),
-          length: data.length,
-        });
+        console.log("TCP Says", data.toString());
         if (!validation) {
           client?.off("data", readHandler);
           return resolve(data);

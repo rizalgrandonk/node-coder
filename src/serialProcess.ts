@@ -5,14 +5,16 @@ import * as SerialAction from "./actions/serial";
 import SerialConnection from "./connections/serial";
 import { expose } from "./utils/childProcess";
 
-const serialWorker = async (uniquecode: string) => {
+const serialWorker = async (message: string) => {
   try {
-    if (uniquecode === "INIT") {
-      await SerialConnection.waitSendData({ timeout: 1500 });
-      return true;
-    }
+    // if (uniquecode === "INIT") {
+    //   await SerialConnection.waitSendData({ timeout: 1500 });
+    //   return true;
+    // }
 
-    return await SerialAction.serialProcess(uniquecode);
+    while (true) {
+      await SerialAction.serialProcess(message);
+    }
   } catch (error: any) {
     console.log(error?.message ?? "Error Serial Process");
     return false;
