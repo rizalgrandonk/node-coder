@@ -12,7 +12,7 @@ import { sleep } from "./utils/helper";
 import prisma from "./db";
 
 (async () => {
-  const MAX_QUEUE = 10000;
+  const MAX_QUEUE = 250;
   const GOALS_LENGTH = 10000;
 
   console.log("START");
@@ -43,7 +43,6 @@ import prisma from "./db";
   await socketWorker.add(socketBuffer);
 
   socketWorker.observe().subscribe((code: string) => {
-    console.log(`${code} Complete`);
     printedBuffer.push(code);
     socketBuffer.shift();
   });
@@ -51,17 +50,9 @@ import prisma from "./db";
 
   serialWorker.run("0");
 
-  while (true) {
+  setInterval(async () => {
     const toUpdate = printedBuffer;
     printedBuffer = [];
-    updatedBufer.push(...toUpdate);
-
-    console.log("MAIN LOOP", {
-      socketBuffer: socketBuffer.length,
-      printedBuffer: printedBuffer.length,
-      updatedBufer: updatedBufer.length,
-      toUpdate: toUpdate.length,
-    });
 
     await prisma.uniquecode.updateMany({
       where: {
@@ -75,15 +66,39 @@ import prisma from "./db";
       },
     });
 
+    updatedBufer.push(...toUpdate);
+
+    console.log("UPDATE LOOP", {
+      socketBuffer: socketBuffer.length,
+      printedBuffer: printedBuffer.length,
+      updatedBufer: updatedBufer.length,
+      toUpdate: toUpdate.length,
+    });
+
     if (updatedBufer.length >= GOALS_LENGTH) {
       console.log("COMPLETE");
       await onCompleteHandler();
     }
+  }, 1000);
 
-    const fromGoals = GOALS_LENGTH - updatedBufer.length;
-    console.log({ toUpdate: toUpdate.length, fromGoals });
+  setInterval(async () => {
+    if (updatedBufer.length >= GOALS_LENGTH) {
+      console.log("COMPLETE");
+      await onCompleteHandler();
+      return;
+    }
+    const fromGoals =
+      GOALS_LENGTH - (updatedBufer.length + printedBuffer.length);
+    const emptySlot = MAX_QUEUE - socketBuffer.length;
+    console.log("GET LOOP", {
+      emptySlot,
+      fromGoals,
+      updatedBufer: updatedBufer.length,
+      socketBuffer: socketBuffer.length,
+      printedBuffer: printedBuffer.length,
+    });
 
-    const toQueueCount = Math.min(toUpdate.length, fromGoals);
+    const toQueueCount = Math.min(emptySlot, fromGoals);
 
     if (MAX_QUEUE < GOALS_LENGTH && toQueueCount > 0) {
       const newUniquecodes = (await getUniquecodes(toQueueCount))?.map(
@@ -96,15 +111,13 @@ import prisma from "./db";
         console.log("Failed get new uniquecodes");
       }
     }
-
-    await sleep(1000);
-  }
+  }, 100);
 
   async function onCompleteHandler() {
     const timeAffter = performance.now();
     const timeDiff = timeAffter - timeBefore;
     console.log(`SOCKET process complete in ${timeDiff} ms`);
-    console.log({ socketBuffer });
+    console.log({ socketBuffer: socketBuffer.length });
 
     // if (socketBuffer.length <= 0) {
     console.log(
