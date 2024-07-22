@@ -1,14 +1,12 @@
 import "dotenv/config";
 import "./db";
 import { getUniquecodes } from "./actions/uniquecodes";
-import EventEmitter from "events";
 
 import { spawn, Worker as ThreadWorker, Thread } from "threads";
 import type { SocketWorker } from "./socketProcess";
 import type { SerialWorker } from "./serialProcess";
 import path from "path";
 import ChildWorker from "./utils/childProcess";
-import { sleep } from "./utils/helper";
 import prisma from "./db";
 
 (async () => {
@@ -25,8 +23,6 @@ import prisma from "./db";
   const socketWorker = await spawn<SocketWorker>(
     new ThreadWorker("./socketProcess")
   );
-
-  // const UniquecodeEvent = new EventEmitter();
 
   const resultUniquecodes = await getUniquecodes(MAX_QUEUE);
   if (!resultUniquecodes) {
@@ -50,7 +46,11 @@ import prisma from "./db";
 
   serialWorker.run("0");
 
-  setInterval(async () => {
+  setInterval(updateBuffer, 1000);
+
+  setInterval(populateBufer, 100);
+
+  async function updateBuffer() {
     const toUpdate = printedBuffer;
     printedBuffer = [];
 
@@ -79,9 +79,9 @@ import prisma from "./db";
       console.log("COMPLETE");
       await onCompleteHandler();
     }
-  }, 1000);
+  }
 
-  setInterval(async () => {
+  async function populateBufer() {
     if (updatedBufer.length >= GOALS_LENGTH) {
       console.log("COMPLETE");
       await onCompleteHandler();
@@ -111,7 +111,7 @@ import prisma from "./db";
         console.log("Failed get new uniquecodes");
       }
     }
-  }, 100);
+  }
 
   async function onCompleteHandler() {
     const timeAffter = performance.now();
@@ -128,47 +128,6 @@ import prisma from "./db";
     process.exit(0);
     // }
   }
-
-  // UniquecodeEvent.on("serialcomplete", onCompleteHandler);
-
-  // UniquecodeEvent.on("socketcomplete", onCompleteHandler);
-
-  // async function serialHandler() {
-  //   while (true) {
-  //     // const selected = uniquecodes[0];
-
-  //     const result = await serialWorker.run("0");
-
-  //     console.log("Result Serial", { result });
-  //     // if (result) {
-  //     //   uniquecodes.shift();
-  //     // }
-  //   }
-
-  //   // serialWorker.kill();
-
-  //   // UniquecodeEvent.emit("serialcomplete");
-  // }
-  // async function socketHandler() {
-  //   while (updatedBufer.length < GOALS_LENGTH) {
-  //     if (socketBuffer.length > 0) {
-  //       const selected = socketBuffer[0];
-  //       const result = await socketWorker(selected);
-  //       console.log({ result });
-
-  //       if (result) {
-  //         socketBuffer.shift();
-  //         printedBuffer.push(selected);
-  //       }
-  //     } else {
-  //       await sleep(0);
-  //     }
-  //   }
-
-  //   // await Thread.terminate(socketWorker);
-
-  //   // UniquecodeEvent.emit("socketcomplete");
-  // }
 })();
 
 // const app = express();
