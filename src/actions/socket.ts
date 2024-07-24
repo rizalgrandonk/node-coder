@@ -1,5 +1,5 @@
 import SocketConnection from "../connections/socket";
-import { updateSocketUniquecode } from "./uniquecodes";
+import { updateSocketUniquecodes } from "./uniquecodes";
 
 export const socketProcess = async (uniquecode: string) => {
   // console.log("Start Socket Process", uniquecode);

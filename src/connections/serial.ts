@@ -1,4 +1,5 @@
 import { SerialPort } from "serialport";
+
 import { ReadlineParser } from "@serialport/parser-readline";
 
 const port = new SerialPort({
@@ -13,7 +14,16 @@ port.pipe(parser);
 
 let intervalConnect: NodeJS.Timeout | undefined = undefined;
 
-function connect() {
+export function connect() {
+  // const port = new SerialPort({
+  //   path: process.env.SERIAL_NAME ?? "/dev/cu.usbmodem1401",
+  //   baudRate: +(process.env.SERIAL_BAUD_RATE ?? 115200),
+  //   autoOpen: false,
+  // });
+  // const parser = new ReadlineParser({
+  //   delimiter: process.env.SERIAL_DELIMITER ?? "\r\n",
+  // });
+  // port.pipe(parser);
   console.log("ConnecRun");
   port.open((err) => {
     if (err) {
@@ -45,7 +55,7 @@ port.on("error", (err) => {
 port.on("close", launchIntervalConnect);
 port.on("end", launchIntervalConnect);
 
-connect();
+// connect();
 
 // let timer = new Date();
 // parser.on("data", (data) => {

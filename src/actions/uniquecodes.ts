@@ -51,15 +51,23 @@ export const updateSerialUniquecode = async (
 
   return result;
 };
-export const updateSocketUniquecode = async (
-  uniquecode: string,
+
+export const updateSocketUniquecodes = async (
+  uniquecodes: string[],
   timestamp: Date
 ) => {
-  const result = await prisma.$executeRaw`
-    UPDATE uniquecode
-    SET coderstatus='COK', printed=${timestamp}
-    WHERE uniquecode=${uniquecode}
-  `;
+  const result = await prisma.uniquecode.updateMany({
+    where: {
+      uniquecode: {
+        in: uniquecodes,
+      },
+    },
+    data: {
+      coderstatus: "COK",
+      printed: timestamp,
+    },
+  });
 
+  console.log({ result });
   return result;
 };
