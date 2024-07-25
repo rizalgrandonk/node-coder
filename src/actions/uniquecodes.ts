@@ -68,6 +68,5 @@ export const updateSocketUniquecodes = async (
     },
   });
 
-  console.log({ result });
   return result;
 };
