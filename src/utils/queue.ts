@@ -17,7 +17,7 @@ export class SharedQueue {
   ) {
     if (typeof bufferOrCapacity === "number") {
       // Initialize with new buffer
-      this.capacity = bufferOrCapacity;
+      this.capacity = bufferOrCapacity + 100;
       this.maxStringLength = maxStringLength!;
       this.itemSize = this.maxStringLength;
 

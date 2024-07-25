@@ -39,7 +39,7 @@ const startPrintProcess = async () => {
   }
 
   console.log("Raw Data", uniquecodes);
-  const printBuffer = new SharedQueue(MAX_QUEUE + 1, 10);
+  const printBuffer = new SharedQueue(MAX_QUEUE, 10);
   printBuffer.push(...uniquecodes);
   const printedBuffer = new SharedQueue(GOALS_LENGTH * 2, 10);
   console.log("printBuffer.size()", printBuffer.size());
