@@ -5,7 +5,7 @@
   "scripts": {
     "start": "npm run build && node dist/index.js",
     "dev": "ts-node-dev src/index.ts",
-    "build": "tsc"
+    "build": "npm --prefix ./client run build && tsc"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +17,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "serialport": "^12.0.0",
+    "socket.io": "^4.7.5",
     "threads": "^1.7.0",
     "ts-node": "^10.9.2"
   },

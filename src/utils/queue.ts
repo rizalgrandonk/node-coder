@@ -13,12 +13,12 @@ export class SharedQueue {
 
   constructor(
     bufferOrCapacity: SharedArrayBuffer | number,
-    maxStringLength?: number
+    maxStringLength: number = 20
   ) {
     if (typeof bufferOrCapacity === "number") {
       // Initialize with new buffer
       this.capacity = bufferOrCapacity + 100;
-      this.maxStringLength = maxStringLength!;
+      this.maxStringLength = maxStringLength;
       this.itemSize = this.maxStringLength;
 
       // Calculate total buffer size: (capacity * itemSize) + overhead (6 bytes for indices)
@@ -44,7 +44,7 @@ export class SharedQueue {
         this.buffer,
         Uint16Array.BYTES_PER_ELEMENT * 3
       );
-      this.maxStringLength = maxStringLength!;
+      this.maxStringLength = maxStringLength;
       this.itemSize = this.maxStringLength;
       this.capacity = this.view.length / this.itemSize;
     }

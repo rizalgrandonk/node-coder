@@ -7,22 +7,33 @@ import path from "path";
 import * as SerialAction from "./actions/serial";
 import type { DatabaseWorker } from "./databaseProcess";
 import { SharedQueue } from "./utils/queue";
-// import express from 'express'
 
-// type PrinterType = "SERIAL" | "SOCKET";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import express from "express";
 
-const startPrintProcess = async () => {
-  // const PRINTER_TYPE: PrinterType = process.env.PRINTER_TYPE
-  //   ? (process.env.PRINTER_TYPE as PrinterType)
-  //   : "SERIAL";
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer);
+
+SerialConnection.connect();
+
+let isPrinting = false;
+let updateInterval: NodeJS.Timeout | null = null;
+
+const startPrintProcess = async (socket: any) => {
+  if (isPrinting) {
+    console.log("Print process is already running");
+    return;
+  }
+  isPrinting = true;
+
   const MAX_QUEUE = 250;
   const GOALS_LENGTH = 10000;
 
   console.log("START");
   const timeBefore = performance.now();
   let timeAfterPrinting: number;
-
-  SerialConnection.connect();
 
   const databaseWorker = await spawn<DatabaseWorker>(
     new ThreadWorker("./databaseProcess")
@@ -31,118 +42,127 @@ const startPrintProcess = async () => {
   const socketWorker = await spawn<SocketWorker>(
     new ThreadWorker("./socketProcess")
   );
-  // const resultUniquecodes = await getUniquecodes(MAX_QUEUE);
+
   const uniquecodes = await databaseWorker.populateBufer(MAX_QUEUE);
   if (!uniquecodes) {
     console.log("Failed to get uniquecodes");
+    isPrinting = false;
     return;
   }
 
   console.log("Raw Data", uniquecodes);
-  const printBuffer = new SharedQueue(MAX_QUEUE, 10);
-  printBuffer.push(...uniquecodes);
-  const printedBuffer = new SharedQueue(GOALS_LENGTH * 2, 10);
-  console.log("printBuffer.size()", printBuffer.size());
-  console.log("printBuffer.getAllItems()", printBuffer.getAll());
+  const printQueue = new SharedQueue(MAX_QUEUE);
+  printQueue.push(...uniquecodes);
 
-  // await socketWorker.add(printBuffer);
-
-  // socketWorker.observe().subscribe((code: string) => {
-  //   const codeIndex = printBuffer.indexOf(code);
-  //   if (codeIndex < 0) {
-  //     return;
-  //   }
-  //   printedBuffer.push(code);
-  //   printBuffer.splice(codeIndex, 1);
-
-  //   if (printedBuffer.length >= GOALS_LENGTH) {
-  //     timeAfterPrinting = performance.now();
-
-  //     updateBuffer();
-  //   }
-  // });
+  const printedQueue = new SharedQueue(GOALS_LENGTH * 2);
+  console.log("printQueue.size()", printQueue.size());
+  console.log("printQueue.getAllItems()", printQueue.getAll());
 
   socketWorker
-    .run(printBuffer.getBuffer(), printedBuffer.getBuffer(), 10)
+    .run(printQueue.getBuffer(), printedQueue.getBuffer())
     .catch((err) => {
       console.log("Error Socket Run", err);
+      isPrinting = false;
     });
+
   runSerialPLC();
 
-  setInterval(populateBufer, 100);
-  // setInterval(() => {
-  //   console.log("MAIN LENGTH Print", printBuffer.size());
-  //   console.log("MAIN LENGTH Printed", printedBuffer.size());
-
-  // }, 100);
+  updateInterval = setInterval(populateBuffer, 100);
 
   async function updateBuffer() {
-    await databaseWorker.updateBuffer(printedBuffer.getAll());
+    await databaseWorker.updateBuffer(printedQueue.getAll());
 
-    if (printedBuffer.size() >= GOALS_LENGTH) {
+    if (printedQueue.size() >= GOALS_LENGTH) {
       console.log("COMPLETE");
       await onCompleteHandler();
     }
   }
 
-  async function populateBufer() {
-    if (printedBuffer.size() >= GOALS_LENGTH) {
+  async function populateBuffer() {
+    if (!isPrinting || printedQueue.size() >= GOALS_LENGTH) {
       timeAfterPrinting = performance.now();
-
       updateBuffer();
     }
 
-    const fromGoals = GOALS_LENGTH - printedBuffer.size();
-    const emptySlot = MAX_QUEUE - printBuffer.size();
+    const fromGoals = GOALS_LENGTH - printedQueue.size();
+    const emptySlot = MAX_QUEUE - printQueue.size();
 
     const toQueueCount = Math.min(emptySlot, fromGoals);
 
     if (MAX_QUEUE < GOALS_LENGTH && toQueueCount > 0) {
       const newUniquecodes = await databaseWorker.populateBufer(toQueueCount);
       if (newUniquecodes) {
-        printBuffer.push(...newUniquecodes);
-        // await socketWorker.add(newUniquecodes);
+        printQueue.push(...newUniquecodes);
       } else {
-        console.log("Failed get new uniquecodes");
+        console.log("Failed to get new uniquecodes");
       }
+    }
+
+    io.emit("printCount", printQueue.size());
+    io.emit("printedCount", printedQueue.size());
+
+    if (!isPrinting) {
+      await onCompleteHandler();
     }
   }
 
   async function onCompleteHandler() {
-    const timeAffter = performance.now();
-    const timeDiff = timeAffter - timeBefore;
+    const timeAfter = performance.now();
+    const timeDiff = timeAfter - timeBefore;
     const printDiff = timeAfterPrinting - timeBefore;
     console.log(`Printing process complete in ${printDiff} ms`);
-    console.log({ printBuffer: printBuffer.size() });
+    console.log({ printQueue: printQueue.size() });
 
     console.log(
-      `Finished processing ${printedBuffer.size()} uniquecodes in ${timeDiff} ms`
+      `Finished processing ${printedQueue.size()} uniquecodes in ${timeDiff} ms`
     );
 
-    console.log(`Update delay for ${timeAffter - timeAfterPrinting}`);
+    console.log(`Update delay for ${timeAfter - timeAfterPrinting}`);
     await Thread.terminate(socketWorker);
-    process.exit(0);
+
+    if (updateInterval) clearInterval(updateInterval);
+    isPrinting = false;
+    socket.emit("printComplete", {
+      printedCount: printedQueue.size(),
+      timeDiff,
+    });
   }
 
   async function runSerialPLC() {
     try {
-      while (true) {
-        const result = await SerialAction.serialProcess("0");
+      while (isPrinting) {
+        await SerialAction.serialProcess("0");
       }
     } catch (error: any) {
       console.log(error?.message ?? "Error Serial Process");
-      return false;
+      isPrinting = false;
     }
   }
 };
 
-startPrintProcess();
+io.on("connection", (socket) => {
+  console.log("Connected", socket.id);
 
-// const app = express();
-// const port = 8585;
+  socket.on("disconnect", () => {
+    console.log("Disconnect", socket.id);
+  });
 
-// // app.use(mainRoutes);
+  socket.on("startPrint", () => {
+    console.log("Start Print Called");
+    startPrintProcess(socket);
+  });
 
-// app.listen(port, () => {
-//   console.log(`Server is Fire at http://localhost:${port}`);
-// });
+  socket.on("stopPrint", () => {
+    console.log("Stop Print Called");
+    isPrinting = false;
+  });
+});
+
+app.use(express.static(path.join(__dirname, "../client/dist")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+});
+
+httpServer.listen(7000, () => {
+  console.log(`Server running on port: 7000`);
+});
