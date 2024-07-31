@@ -6,9 +6,17 @@ import React, {
   ReactNode,
 } from "react";
 import { io } from "socket.io-client";
+import env from "@/configs/env";
 
+const SOCKET_URL =
+  env.VITE_APP_ENVIRONTMENT === "production"
+    ? window.location.origin
+    : env.VITE_APP_WEBSOCKET_URL;
+
+console.log({ SOCKET_URL, env });
 // Create a socket instance
-export let socket = io(window.location.origin, {
+export let socket = io(SOCKET_URL, {
+  path: "/socket",
   autoConnect: false,
 });
 

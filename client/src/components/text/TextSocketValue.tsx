@@ -8,7 +8,6 @@ type TestSocketValueProps = {
 const TextSocketValue: React.FC<TestSocketValueProps> = ({ channel }) => {
   const socketCtx = useSocket();
   const [socketData, setSocketData] = useState<number>(0);
-  console.log("socketCtx.isConnected", socketCtx.isConnected);
   useEffect(() => {
     socketCtx.context.on(channel, (val) => {
       setSocketData(val);

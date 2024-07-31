@@ -1,12 +1,12 @@
 import Modal from "@/components/modal/Modal";
-import { useState } from "react";
-const ModalLookupPersonel = () => {
-  const [showModal, setShowModal] = useState(false);
+
+const ModalLookupPersonel = ({ showModal, setShowModal }: any) => {
   return (
     <Modal
+      size="lg"
       showModal={showModal}
       setShowModal={setShowModal}
-      title="Modal Title"
+      title="SCAN PERSONEL"
       footer={
         <>
           <button
@@ -26,10 +26,52 @@ const ModalLookupPersonel = () => {
         </>
       }
     >
-      <p className="my-4 text-blueGray-500 text-lg leading-relaxed">
-        I always felt like I could do anything. That’s the main thing people are controlled by! Thoughts- their perception of themselves! They're slowed down by
-        their perception of themselves. If you're taught you can’t do anything, you won’t do anything. I was taught I could do everything.
-      </p>
+      <div className="my-4 min-w-48 text-blueGray-500 text-lg leading-relaxed">
+        <div>
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium leading-6 text-gray-900"
+          >
+            NIK
+          </label>
+          <div className="my-2 flex flex-row">
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="rounded-md border border-gray-300 bg-white py-1.5 px-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+          >
+            Clear
+          </button>
+        </div>
+        <div>
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium leading-6 text-gray-900"
+          >
+            Personel
+          </label>
+          <div className="my-2 flex flex-row">
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            />
+          </div>
+        </div>
+      </div>
     </Modal>
   );
 };

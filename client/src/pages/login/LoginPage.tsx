@@ -24,18 +24,17 @@ const LoginPage = () => {
           <form onSubmit={loginHandler} className="space-y-6">
             <div>
               <label
-                htmlFor="email"
+                htmlFor="username"
                 className="block text-sm font-medium leading-6 text-gray-900"
               >
                 Username
               </label>
               <div className="mt-2">
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
+                  id="username"
+                  name="username"
+                  type="text"
                   required
-                  autoComplete="email"
                   className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                 />
               </div>
@@ -54,7 +53,7 @@ const LoginPage = () => {
                     href="#"
                     className="font-semibold text-indigo-600 hover:text-indigo-500"
                   >
-                    Lupa password?
+                    Forgot password?
                   </a>
                 </div>
               </div>
@@ -81,12 +80,12 @@ const LoginPage = () => {
           </form>
 
           <p className="mt-10 text-center text-sm text-gray-500">
-            Belum punya akun ?{" "}
+            Doesn't have account ?{" "}
             <a
               href="#"
               className="font-semibold leading-6 text-indigo-600 hover:text-indigo-500"
             >
-              Hubungi Koordinator
+              Register now
             </a>
           </p>
         </div>
