@@ -1,0 +1,3 @@
+Handle apabila koneksi ke Serial Terputus / Gagal
+Handle apabila koneksi ke Socket Terputus / Gagal
+Handle apabila koneksi ke Database Terputus / Gagal

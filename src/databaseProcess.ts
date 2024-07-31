@@ -16,21 +16,6 @@ async function updateBuffer(printedBuffer: string[]) {
   await Promise.all(
     chunks.map((codes) => setBulkPrintedStatus(codes, new Date()))
   );
-
-  // updatedBufer.push(...toUpdate);
-
-  // console.log("UPDATE LOOP", {
-  //   socketBuffer: socketBuffer.length,
-  //   printedBuffer: printedBuffer.length,
-  //   // updatedBufer: updatedBufer.length,
-  //   // toUpdate: toUpdate.length,
-  // });
-
-  // if (printedBuffer.length >= GOALS_LENGTH) {
-  //   console.log("COMPLETE");
-  //   // await onCompleteHandler();
-  //   subject.next(selected);
-  // }
 }
 
 async function populateBufer(limit: number) {

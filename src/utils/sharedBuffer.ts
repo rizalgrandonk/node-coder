@@ -157,6 +157,34 @@ export class SharedQueue {
 
     return value;
   }
+
+  shiftAll(): string[] {
+    while (!this.acquireLock());
+
+    const head = Atomics.load(this.indexView, this.headIndex);
+    const tail = Atomics.load(this.indexView, this.tailIndex);
+    const items: string[] = [];
+
+    if (head !== tail) {
+      let current = head;
+      do {
+        const start = current * this.itemSize;
+        const encodedValue = this.view.slice(
+          start,
+          start + this.maxStringLength
+        );
+        const value = new TextDecoder().decode(encodedValue).replace(/\0/g, "");
+        items.push(value);
+        current = (current + 1) % this.capacity;
+      } while (current !== tail);
+
+      // Reset the queue
+      Atomics.store(this.indexView, this.headIndex, tail);
+    }
+
+    this.releaseLock();
+    return items;
+  }
 }
 
 export class SharedPrimitive<

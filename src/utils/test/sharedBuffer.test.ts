@@ -57,6 +57,28 @@ describe("Shared Queue", () => {
     });
   });
 
+  it("can shift all the right data from the queue", () => {
+    const rawData = [
+      "00001",
+      "00002",
+      "00003",
+      "00004",
+      "00005",
+      "00006",
+      "00007",
+      "00008",
+      "00009",
+      "00010",
+    ];
+    const queue = new SharedQueue(10);
+    queue.push(...rawData);
+
+    expect(queue.size()).toEqual(rawData.length);
+
+    expect(queue.shiftAll()).toEqual(rawData);
+    expect(queue.size()).toEqual(0);
+  });
+
   it("can shift the right data from the queue with diff", () => {
     const rawData = ["00001", "00002"];
     const queue = new SharedQueue(10);

@@ -4,11 +4,7 @@ import SerialConnection, {
 } from "../connections/serial";
 import net from "net";
 
-// const CONNECTION_MAP = {
-//   socket: SocketConnection,
-//   serial: SerialConnection,
-// };
-
+// Define the configuration type for different connection types
 type Config =
   | {
       connectionType: "socket";
@@ -19,206 +15,116 @@ type Config =
       connectionConfig: SerialConnectionParameterType;
     };
 
+// Main class for handling Liebinger printer operations
 export default class LiebingerClass {
   private connection: SocketConnection | SerialConnection;
+
+  // Initialize the class with the appropriate connection type
   constructor({ connectionType, connectionConfig }: Config) {
     this.connection =
       connectionType === "socket"
         ? new SocketConnection(connectionConfig)
         : new SerialConnection(connectionConfig);
+
+    this.connection.connect();
   }
 
+  // Private method to execute a command and validate the response
+  private async executeCommand(command: string, responseCheck?: string) {
+    try {
+      const response = await this.connection.writeAndResponse(command, {
+        responseValidation: responseCheck
+          ? (res) => res.includes(responseCheck)
+          : undefined,
+      });
+      if (!response) {
+        console.log(`Failed request to ${this.connection.constructor.name}`);
+        return;
+      }
+      return response;
+    } catch (error: any) {
+      console.log(error?.message ?? "Error Serial Process");
+      return;
+    }
+  }
+
+  public write(data: string, cb?: (err?: Error | null) => void) {
+    return this.connection.write(data, cb);
+  }
+
+  public onData(listener: (data: any) => void) {
+    this.connection.onData(listener);
+  }
+  public offData(listener: (data: any) => void) {
+    this.connection.offData(listener);
+  }
+
+  // Method to check the printer status
   async checkPrinterStatus() {
     const command = `^0?RS\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
+    const response = await this.executeCommand(command, `RS`);
+    if (!response) return;
 
-      //^0=RS2 6       0       0       80      0
-      const parts = response.split(/\s+/);
-      const responseType = parts[0].slice(0, -1);
-      const nozzleState = parseInt(parts[0].slice(-1), 10);
-      const machineState = parseInt(parts[1], 10);
-      const errorCode = parseInt(parts[2], 10);
-      const headCover = parseInt(parts[3], 10);
-      const actSpeed = parseInt(parts[5], 10);
-      return {
-        responseType,
-        nozzleState,
-        machineState,
-        errorCode,
-        headCover,
-        actSpeed,
-      };
-      // return {
-      //   responseType: "^0=RS",
-      //   nozzleState: 2,
-      //   machineState: 6,
-      //   errorCode: 0,
-      //   headCover: 0,
-      //   actSpeed: 0
-      // }
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    // Parse the response
+    const parts = response.split(/\s+/);
+    return {
+      response,
+      nozzleState: parseInt(parts[0].slice(-1), 10),
+      machineState: parseInt(parts[1], 10),
+      errorState: parseInt(parts[2], 10),
+      headCover: parseInt(parts[3], 10),
+      actSpeed: parseInt(parts[5], 10),
+    };
   }
 
+  // Method to check mailing status
   async checkMailingStatus() {
-    const command = `^0?SM\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        // responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
-      return response;
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    return this.executeCommand(`^0?SM\r\n`, "SM");
   }
 
+  // Method to start printing
   async startPrint() {
-    const command = `^0!GO\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        // responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
-      return response;
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    return this.executeCommand(`^0!GO\r\n`, "GO");
   }
 
+  // Method to stop printing
   async stopPrint() {
-    const command = `^0!ST\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        // responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
-      return response;
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    return this.executeCommand(`^0!ST\r\n`, "ST");
   }
 
+  // Method to open the nozzle
   async openNozzle() {
-    const command = `^0!NO\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        // responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
-      return response;
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    return this.executeCommand(`^0!NO\r\n`, "NO");
   }
 
+  // Method to reset the counter
   async resetCounter() {
-    const command = `^0=CC0\t0\t0\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        // responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
-      return response;
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    return this.executeCommand(`^0=CC0\t0\t0\r\n`, "CC");
   }
 
+  // Method to flush the FIFO buffer
   async flushFIFO() {
-    const command = `^0!FF\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        // responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
-      return response;
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    return this.executeCommand(`^0!FF\r\n`, "FF");
   }
 
+  // Method to show the display
   async showDisplay() {
-    const command = `^0!W1\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        // responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
-      return response;
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    return this.executeCommand(`^0!W1\r\n`, "W1");
   }
 
+  // Method to hide the display
   async hideDisplay() {
-    const command = `^0!W0\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        // responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
-      return response;
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    return this.executeCommand(`^0!W0\r\n`, "W0");
   }
 
+  // Method to close the error
   async closeError() {
-    const command = `^0!EQ\r\n`;
-    try {
-      const response = await this.connection.writeAndResponse(command, {
-        // responseValidation: (res) => res.includes(command),
-      });
-      if (!response) {
-        console.log("Failed request to socket connection");
-        return;
-      }
-      return response;
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      return;
-    }
+    return this.executeCommand(`^0!EQ\r\n`, "EQ");
+  }
+
+  // Method to append to the FIFO with a counter and unique code
+  async appendFifo(counter: number, uniquecode: string) {
+    const command = `^0=MR${counter}\t${uniquecode}\r\n`;
+    return this.executeCommand(command, "MR");
   }
 }
