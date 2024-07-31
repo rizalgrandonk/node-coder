@@ -24,9 +24,9 @@ const run = async () => {
       if (codes.length > 0) {
         const selected = codes[0];
         const result = await SerialAction.serialProcess(selected);
-        result &&
-          process.send &&
-          process.send({ channel: "run", data: selected });
+        // result &&
+        //   process.send &&
+        //   process.send({ channel: "run", data: selected });
         // if (result) {
         //   codes.shift();
         // }

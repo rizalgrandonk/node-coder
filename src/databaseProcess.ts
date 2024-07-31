@@ -1,6 +1,7 @@
 import { Observable, Subject } from "threads/observable";
-import { getUniquecodes, updateSocketUniquecodes } from "./actions/uniquecodes";
-import prisma from "./db";
+// import { getUniquecodes, updateSocketUniquecodes } from "./actions/uniquecodes";
+import { getUniquecodes, setBulkPrintedStatus } from "./services/uniquecodes";
+// import prisma from "./db";
 import { chunkArray } from "./utils/helper";
 import { expose } from "threads";
 
@@ -13,7 +14,7 @@ import { expose } from "threads";
 async function updateBuffer(printedBuffer: string[]) {
   const chunks = chunkArray(printedBuffer, 500);
   await Promise.all(
-    chunks.map((codes) => updateSocketUniquecodes(codes, new Date()))
+    chunks.map((codes) => setBulkPrintedStatus(codes, new Date()))
   );
 
   // updatedBufer.push(...toUpdate);

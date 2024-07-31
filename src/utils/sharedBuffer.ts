@@ -158,3 +158,89 @@ export class SharedQueue {
     return value;
   }
 }
+
+export class SharedPrimitive<
+  T extends number | boolean | string | undefined | null | bigint
+> {
+  private buffer: SharedArrayBuffer;
+  private view: DataView;
+  private stringView: Uint8Array;
+
+  private readonly typeOffset = 0;
+  private readonly valueOffset = 4;
+  private readonly maxStringLength: number;
+
+  constructor(
+    initialValueOrBuffer: T | SharedArrayBuffer,
+    maxStringLength: number = 100
+  ) {
+    this.maxStringLength = maxStringLength;
+    const bufferSize = 4 + 8 + maxStringLength; // 4 bytes for type, 8 bytes for number/bigint, rest for string
+
+    if (initialValueOrBuffer instanceof SharedArrayBuffer) {
+      if (initialValueOrBuffer.byteLength < bufferSize) {
+        throw new Error("Provided buffer is too small");
+      }
+      this.buffer = initialValueOrBuffer;
+    } else {
+      this.buffer = new SharedArrayBuffer(bufferSize);
+    }
+
+    this.view = new DataView(this.buffer);
+    this.stringView = new Uint8Array(this.buffer, this.valueOffset);
+
+    if (!(initialValueOrBuffer instanceof SharedArrayBuffer)) {
+      this.set(initialValueOrBuffer);
+    }
+  }
+
+  getBuffer(): SharedArrayBuffer {
+    return this.buffer;
+  }
+
+  set(value: T): void {
+    if (typeof value === "number") {
+      this.view.setUint32(this.typeOffset, 1, true);
+      this.view.setFloat64(this.valueOffset, value, true);
+    } else if (typeof value === "boolean") {
+      this.view.setUint32(this.typeOffset, 2, true);
+      this.view.setUint8(this.valueOffset, value ? 1 : 0);
+    } else if (typeof value === "string") {
+      this.view.setUint32(this.typeOffset, 3, true);
+      const encoder = new TextEncoder();
+      const encoded = encoder.encode(value.slice(0, this.maxStringLength));
+      this.stringView.set(encoded);
+      this.stringView.fill(0, encoded.length);
+    } else if (value === undefined) {
+      this.view.setUint32(this.typeOffset, 4, true);
+    } else if (value === null) {
+      this.view.setUint32(this.typeOffset, 5, true);
+    } else if (typeof value === "bigint") {
+      this.view.setUint32(this.typeOffset, 6, true);
+      this.view.setBigInt64(this.valueOffset, value, true);
+    } else {
+      throw new Error("Unsupported type");
+    }
+  }
+
+  get(): T {
+    const type = this.view.getUint32(this.typeOffset, true);
+    switch (type) {
+      case 1: // number
+        return this.view.getFloat64(this.valueOffset, true) as T;
+      case 2: // boolean
+        return (this.view.getUint8(this.valueOffset) === 1) as T;
+      case 3: // string
+        const decoder = new TextDecoder();
+        return decoder.decode(this.stringView).replace(/\0/g, "") as T;
+      case 4: // undefined
+        return undefined as T;
+      case 5: // null
+        return null as T;
+      case 6: // bigint
+        return this.view.getBigInt64(this.valueOffset, true) as T;
+      default:
+        throw new Error("Invalid type stored");
+    }
+  }
+}

@@ -1,27 +1,45 @@
 import "dotenv/config";
 import "./db";
-import * as SerialConnection from "./connections/serial";
+// import "./connections/socket";
 import { spawn, Worker as ThreadWorker, Thread } from "threads";
 import type { SocketWorker } from "./socketProcess";
 import path from "path";
-import * as SerialAction from "./actions/serial";
+// import * as SerialAction from "./actions/serial";
 import type { DatabaseWorker } from "./databaseProcess";
-import { SharedQueue } from "./utils/queue";
+import { SharedQueue } from "./utils/sharedBuffer";
 
 import { createServer } from "http";
 import { Server } from "socket.io";
 import express from "express";
+import mainRoutes from "./routes/index";
+import SerialConnection from "./connections/serial";
+import { insertSerialUniquecode } from "./services/codererrorlogs";
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer);
+const io = new Server(httpServer, {
+  path: "/socket",
+  cors: {
+    origin: "*",
+  },
+});
 
-SerialConnection.connect();
+const serialConnection = new SerialConnection({
+  portOptions: {
+    path: process.env.SERIAL_NAME ?? "/dev/cu.usbmodem1401",
+    baudRate: +(process.env.SERIAL_BAUD_RATE ?? 115200),
+  },
+  parserOptions: {
+    delimiter: process.env.SERIAL_DELIMITER ?? "\r\n",
+  },
+});
+
+serialConnection.connect();
 
 let isPrinting = false;
 let updateInterval: NodeJS.Timeout | null = null;
 
-const startPrintProcess = async (socket: any) => {
+const startPrintProcess = async () => {
   if (isPrinting) {
     console.log("Print process is already running");
     return;
@@ -98,7 +116,7 @@ const startPrintProcess = async (socket: any) => {
       }
     }
 
-    io.emit("printCount", printQueue.size());
+    io.emit("bufferCount", printQueue.size());
     io.emit("printedCount", printedQueue.size());
 
     if (!isPrinting) {
@@ -122,20 +140,31 @@ const startPrintProcess = async (socket: any) => {
 
     if (updateInterval) clearInterval(updateInterval);
     isPrinting = false;
-    socket.emit("printComplete", {
+    io.emit("printComplete", {
       printedCount: printedQueue.size(),
       timeDiff,
     });
   }
 
   async function runSerialPLC() {
-    try {
-      while (isPrinting) {
-        await SerialAction.serialProcess("0");
+    while (isPrinting) {
+      try {
+        const response = await serialConnection.writeAndResponse("0", {
+          responseValidation: (res) => typeof res === "string",
+          timeout: 2000,
+        });
+        if (!response) {
+          console.log("Failed request to serial connection");
+          return false;
+        }
+        const result = await insertSerialUniquecode(response, new Date());
+        console.log(`Complete processing serial update ${response}`, result);
+
+        return true;
+      } catch (error: any) {
+        console.log(error?.message ?? "Error Serial Process");
+        isPrinting = false;
       }
-    } catch (error: any) {
-      console.log(error?.message ?? "Error Serial Process");
-      isPrinting = false;
     }
   }
 };
@@ -149,7 +178,7 @@ io.on("connection", (socket) => {
 
   socket.on("startPrint", () => {
     console.log("Start Print Called");
-    startPrintProcess(socket);
+    startPrintProcess();
   });
 
   socket.on("stopPrint", () => {
@@ -158,10 +187,18 @@ io.on("connection", (socket) => {
   });
 });
 
-app.use(express.static(path.join(__dirname, "../client/dist")));
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+app.use(express.json());
+app.use(mainRoutes);
+
+app.get("/start-print", (req, res) => {
+  startPrintProcess();
+  return res.status(200).json({ message: "Success" });
 });
+
+// app.use(express.static(path.join(__dirname, "../client/dist")));
+// app.get("*", (req, res) => {
+//   res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+// });
 
 httpServer.listen(7000, () => {
   console.log(`Server running on port: 7000`);
