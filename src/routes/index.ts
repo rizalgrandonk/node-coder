@@ -6,6 +6,7 @@ import productRoutes from "./products";
 // } from "../connections/serial";
 import uniquecodeRoutes from "./uniquecodes";
 import playgroundRoutes from "./playground";
+import testRoutes from "./test";
 
 const mainRoutes = express.Router();
 // const serialConfig: SerialConnectionParameterType = {
@@ -73,5 +74,6 @@ const mainRoutes = express.Router();
 mainRoutes.use("/products", productRoutes);
 mainRoutes.use("/uniquecodes", uniquecodeRoutes);
 mainRoutes.use("/playground", playgroundRoutes);
+mainRoutes.use("/test", testRoutes);
 
 export default mainRoutes;

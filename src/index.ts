@@ -2,10 +2,10 @@ import "dotenv/config";
 import "./db";
 // import "./connections/socket";
 import { spawn, Worker as ThreadWorker, Thread } from "threads";
-import type { SocketWorker } from "./socketProcess";
-import path from "path";
+// import type { SocketWorker } from "./socketProcess";
+// import path from "path";
 // import * as SerialAction from "./actions/serial";
-import type { DatabaseWorker } from "./databaseProcess";
+// import type { DatabaseWorker } from "./databaseProcess";
 import { SharedPrimitive, SharedQueue } from "./utils/sharedBuffer";
 
 import { createServer } from "http";
@@ -15,6 +15,7 @@ import mainRoutes from "./routes/index";
 import SerialConnection from "./connections/serial";
 import { insertSerialUniquecode } from "./services/codererrorlogs";
 import { DatabaseThread } from "./threads/databaseThread";
+import { PrinterThread } from "./threads/printerThread";
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,17 +36,18 @@ const serialConnection = new SerialConnection({
   },
 });
 
-serialConnection.connect();
+// serialConnection.connect();
 
 let updateInterval: NodeJS.Timeout | null = null;
-const MAX_QUEUE = 250;
-const GOALS_LENGTH = 10000;
+const MAX_QUEUE = Number(process.env.MAX_QUEUE ?? 254);
 
 const isPrinting = new SharedPrimitive<boolean>(false);
 const printerCounter = new SharedPrimitive<number>(0);
 const displayMessage = new SharedPrimitive<string>("");
+
 const printQueue = new SharedQueue(MAX_QUEUE);
-const printedQueue = new SharedQueue(GOALS_LENGTH * 2);
+const printedQueue = new SharedQueue(MAX_QUEUE * 2);
+const DBUpdateQueue = new SharedQueue(MAX_QUEUE * 2);
 
 const startPrintProcess = async () => {
   if (isPrinting.get()) {
@@ -61,20 +63,25 @@ const startPrintProcess = async () => {
   const databaseThread = await spawn<DatabaseThread>(
     new ThreadWorker("./threads/databaseThread")
   );
+  // const printerThread = await spawn<PrinterThread>(
+  //   new ThreadWorker("./threads/printerThread")
+  // );
+
   await databaseThread.init({
     isPrintBuffer: isPrinting.getBuffer(),
     printBuffer: printQueue.getBuffer(),
     printedBuffer: printedQueue.getBuffer(),
+    DBUpdateBuffer: DBUpdateQueue.getBuffer(),
   });
 
-  const socketWorker = await spawn<SocketWorker>(
-    new ThreadWorker("./socketProcess")
-  );
-  await socketWorker.init({
-    isPrintBuffer: isPrinting.getBuffer(),
-    printBuffer: printQueue.getBuffer(),
-    printedBuffer: printedQueue.getBuffer(),
-  });
+  // await printerThread.init({
+  //   isPrintBuffer: isPrinting.getBuffer(),
+  //   printBuffer: printQueue.getBuffer(),
+  //   printedBuffer: printedQueue.getBuffer(),
+  //   DBUpdateBuffer: DBUpdateQueue.getBuffer(),
+  //   printCounterBuffer: printerCounter.getBuffer(),
+  //   displayMessageBuffer: displayMessage.getBuffer(),
+  // });
 
   const uniquecodes = await databaseThread.populateBufer(MAX_QUEUE);
   if (!uniquecodes) {
@@ -85,62 +92,24 @@ const startPrintProcess = async () => {
 
   printQueue.push(...uniquecodes);
 
-  const socketWorkerRun = socketWorker.run().catch((err) => {
-    console.log("Error Socket Run", err);
-    isPrinting.set(false);
-  });
-
   const databaseThreadRun = databaseThread.run().catch((err) => {
     console.log("Error Socket Run", err);
     isPrinting.set(false);
   });
+  // const printerThreadRun = printerThread.run().catch((err) => {
+  //   console.log("Error Socket Run", err);
+  //   isPrinting.set(false);
+  // });
 
-  const serialPLCRun = runSerialPLC();
+  // const serialPLCRun = runSerialPLC();
 
   updateInterval = setInterval(async () => {
-    if (!isPrinting.get() || printedQueue.size() >= GOALS_LENGTH) {
+    if (!isPrinting.get()) {
       isPrinting.set(false);
       timeAfterPrinting = performance.now();
       await onCompleteHandler();
     }
   }, 100);
-
-  // async function updateBuffer() {
-  //   await databaseWorker.updateBuffer(printedQueue.getAll());
-
-  //   if (printedQueue.size() >= GOALS_LENGTH) {
-  //     console.log("COMPLETE");
-  //     await onCompleteHandler();
-  //   }
-  // }
-
-  // async function populateBuffer() {
-  //   if (!isPrinting.get() || printedQueue.size() >= GOALS_LENGTH) {
-  //     timeAfterPrinting = performance.now();
-  //     updateBuffer();
-  //   }
-
-  //   const fromGoals = GOALS_LENGTH - printedQueue.size();
-  //   const emptySlot = MAX_QUEUE - printQueue.size();
-
-  //   const toQueueCount = Math.min(emptySlot, fromGoals);
-
-  //   if (MAX_QUEUE < GOALS_LENGTH && toQueueCount > 0) {
-  //     const newUniquecodes = await databaseWorker.populateBufer(toQueueCount);
-  //     if (newUniquecodes) {
-  //       printQueue.push(...newUniquecodes);
-  //     } else {
-  //       console.log("Failed to get new uniquecodes");
-  //     }
-  //   }
-
-  //   io.emit("bufferCount", printQueue.size());
-  //   io.emit("printedCount", printedQueue.size());
-
-  //   if (!isPrinting) {
-  //     await onCompleteHandler();
-  //   }
-  // }
 
   async function onCompleteHandler() {
     const timeAfter = performance.now();
@@ -156,9 +125,7 @@ const startPrintProcess = async () => {
     console.log(`Update delay for ${timeAfter - timeAfterPrinting}`);
 
     await databaseThreadRun;
-    await socketWorkerRun;
-    await serialPLCRun;
-    await Thread.terminate(socketWorker);
+    // await serialPLCRun;
     await Thread.terminate(databaseThread);
 
     if (updateInterval) clearInterval(updateInterval);
@@ -187,7 +154,6 @@ const startPrintProcess = async () => {
         return true;
       } catch (error: any) {
         console.log(error?.message ?? "Error Serial Process");
-        isPrinting.set(false);
       }
     }
   }

@@ -3,48 +3,57 @@ import { SharedPrimitive, SharedQueue } from "../sharedBuffer";
 describe("Shared Queue", () => {
   it("can add single item to the queue", () => {
     const queue = new SharedQueue(10);
-    queue.push("12345");
-    expect(queue.getAll()).toEqual(["12345"]);
+    queue.push({ id: 1000000, uniquecode: "12345" });
+    expect(queue.getAll()).toEqual([{ id: 1000000, uniquecode: "12345" }]);
   });
   it("can add multiple items to the queue", () => {
+    const rawData = [
+      { id: 1000001, uniquecode: "00001" },
+      { id: 1000002, uniquecode: "00002" },
+      { id: 1000003, uniquecode: "00003" },
+      { id: 1000004, uniquecode: "00004" },
+      { id: 1000005, uniquecode: "00005" },
+    ];
     const queue = new SharedQueue(10);
-    queue.push("12345", "ABCDE", "QWERT", "WASDX", "ZXCVB");
-    expect(queue.getAll()).toEqual([
-      "12345",
-      "ABCDE",
-      "QWERT",
-      "WASDX",
-      "ZXCVB",
-    ]);
+    queue.push(...rawData);
+    expect(queue.getAll()).toEqual(rawData);
   });
   it("can read all items in the queue", () => {
+    const rawData = [
+      { id: 1000001, uniquecode: "00001" },
+      { id: 1000002, uniquecode: "00002" },
+      { id: 1000003, uniquecode: "00003" },
+      { id: 1000004, uniquecode: "00004" },
+      { id: 1000005, uniquecode: "00005" },
+    ];
     const queue = new SharedQueue(10);
-    queue.push("00001", "00002", "00003", "00004", "00005");
-    expect(queue.getAll()).toEqual([
-      "00001",
-      "00002",
-      "00003",
-      "00004",
-      "00005",
-    ]);
+    queue.push(...rawData);
+    expect(queue.getAll()).toEqual(rawData);
   });
   it("can get length all items in the queue", () => {
+    const rawData = [
+      { id: 1000001, uniquecode: "00001" },
+      { id: 1000002, uniquecode: "00002" },
+      { id: 1000003, uniquecode: "00003" },
+      { id: 1000004, uniquecode: "00004" },
+      { id: 1000005, uniquecode: "00005" },
+    ];
     const queue = new SharedQueue(10);
-    queue.push("00001", "00002", "00003", "00004");
-    expect(queue.size()).toEqual(4);
+    queue.push(...rawData);
+    expect(queue.size()).toEqual(rawData.length);
   });
   it("can shift the right data from the queue", () => {
     const rawData = [
-      "00001",
-      "00002",
-      "00003",
-      "00004",
-      "00005",
-      "00006",
-      "00007",
-      "00008",
-      "00009",
-      "00010",
+      { id: 1000001, uniquecode: "00001" },
+      { id: 1000002, uniquecode: "00002" },
+      { id: 1000003, uniquecode: "00003" },
+      { id: 1000004, uniquecode: "00004" },
+      { id: 1000005, uniquecode: "00005" },
+      { id: 1000006, uniquecode: "00006" },
+      { id: 1000007, uniquecode: "00007" },
+      { id: 1000008, uniquecode: "00008" },
+      { id: 1000009, uniquecode: "00009" },
+      { id: 1000010, uniquecode: "00010" },
     ];
     const queue = new SharedQueue(10);
     queue.push(...rawData);
@@ -53,22 +62,22 @@ describe("Shared Queue", () => {
 
     rawData.forEach((data) => {
       const item = queue.shift();
-      expect(item).toBe(data);
+      expect(item).toEqual(data);
     });
   });
 
   it("can shift all the right data from the queue", () => {
     const rawData = [
-      "00001",
-      "00002",
-      "00003",
-      "00004",
-      "00005",
-      "00006",
-      "00007",
-      "00008",
-      "00009",
-      "00010",
+      { id: 1000001, uniquecode: "00001" },
+      { id: 1000002, uniquecode: "00002" },
+      { id: 1000003, uniquecode: "00003" },
+      { id: 1000004, uniquecode: "00004" },
+      { id: 1000005, uniquecode: "00005" },
+      { id: 1000006, uniquecode: "00006" },
+      { id: 1000007, uniquecode: "00007" },
+      { id: 1000008, uniquecode: "00008" },
+      { id: 1000009, uniquecode: "00009" },
+      { id: 1000010, uniquecode: "00010" },
     ];
     const queue = new SharedQueue(10);
     queue.push(...rawData);
@@ -79,21 +88,13 @@ describe("Shared Queue", () => {
     expect(queue.size()).toEqual(0);
   });
 
-  it("can shift the right data from the queue with diff", () => {
-    const rawData = ["00001", "00002"];
-    const queue = new SharedQueue(10);
-    queue.push(...rawData);
-
-    expect(queue.size()).toEqual(rawData.length);
-
-    rawData.forEach((data) => {
-      const item = queue.shift();
-      expect(item).toBe(data);
-    });
-  });
-
   it("can be re-initialize with the same refrence and should have the same value", () => {
-    const rawData = ["00001", "00002", "00003", "00004"];
+    const rawData = [
+      { id: 1000001, uniquecode: "00001" },
+      { id: 1000002, uniquecode: "00002" },
+      { id: 1000003, uniquecode: "00003" },
+      { id: 1000004, uniquecode: "00004" },
+    ];
     const queue1 = new SharedQueue(10);
     queue1.push(...rawData);
 
@@ -105,12 +106,18 @@ describe("Shared Queue", () => {
     expect(queue2.getAll()).toEqual(queue1.getAll());
     expect(queue2.getBuffer()).toEqual(queue1.getBuffer());
 
-    queue2.push("00005");
+    queue2.push({ id: 1000005, uniquecode: "00005" });
 
     expect(queue2.size()).toEqual(rawData.length + 1);
-    expect(queue2.getAll()).toEqual([...rawData, "00005"]);
+    expect(queue2.getAll()).toEqual([
+      ...rawData,
+      { id: 1000005, uniquecode: "00005" },
+    ]);
     expect(queue1.size()).toEqual(rawData.length + 1);
-    expect(queue1.getAll()).toEqual([...rawData, "00005"]);
+    expect(queue1.getAll()).toEqual([
+      ...rawData,
+      { id: 1000005, uniquecode: "00005" },
+    ]);
   });
 });
 

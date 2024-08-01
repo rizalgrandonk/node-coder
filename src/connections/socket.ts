@@ -108,8 +108,10 @@ export default class SocketConnection {
     return this.client.write(data, cb);
   }
 
-  public onData(listener: (data: any) => void) {
-    this.client.on("data", listener);
+  public onData(listener: (data: string) => void) {
+    this.client.on("data", (val) => {
+      listener(val.toString());
+    });
   }
   public offData(listener: (data: any) => void) {
     this.client.on("data", listener);

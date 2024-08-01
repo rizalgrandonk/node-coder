@@ -42,12 +42,12 @@ const run = async () => {
     const selected = printQueue.shift();
     if (selected) {
       const response = await printer.checkPrinterStatus();
-      if (!response) {
-        console.log("Failed request to socket connection");
-        printQueue.push(selected);
-      } else {
-        printedQueue.push(selected);
-      }
+      // if (!response) {
+      //   console.log("Failed request to socket connection");
+      //   printQueue.push(selected);
+      // } else {
+      //   printedQueue.push(selected);
+      // }
     } else {
       await sleep(0);
     }

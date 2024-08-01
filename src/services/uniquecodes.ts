@@ -1,6 +1,10 @@
 import db from "../db";
 
-export const getUniquecodes = async (limit: number = 250) => {
+export const getUniquecodes: (
+  limit?: number
+) => Promise<{ id: number; uniquecode: string }[] | undefined> = async (
+  limit: number = 250
+) => {
   const buffered = new Date();
   const printerlineid = 9999;
   const markingprinterid = 9999;
@@ -28,7 +32,7 @@ export const getUniquecodes = async (limit: number = 250) => {
       "batchid" = $6
     FROM sub
     WHERE m."id" = sub."id"
-    RETURNING *;
+    RETURNING m."id", m."uniquecode";
   `;
 
   const result = await db.query(query, [
@@ -48,17 +52,33 @@ export const getUniquecodes = async (limit: number = 250) => {
 };
 
 export const setBulkPrintedStatus = async (
-  uniquecodes: string[],
+  uniquecodeIds: number[],
   timestamp: Date
 ) => {
-  const coderstatus = "COK";
+  const coderstatus = "PRINTED";
   const query = `
     UPDATE uniquecode
     SET coderstatus=$1, printed=$2
-    WHERE uniquecode = ANY($3::text[])
+    WHERE id = ANY($3::number[])
   `;
 
-  const result = await db.query(query, [coderstatus, timestamp, uniquecodes]);
+  const result = await db.query(query, [coderstatus, timestamp, uniquecodeIds]);
+
+  return result.rowCount;
+};
+
+export const setBulkUNEStatus = async (
+  uniquecodeIds: number[],
+  timestamp: Date
+) => {
+  const coderstatus = "UNE";
+  const query = `
+    UPDATE uniquecode
+    SET coderstatus=$1
+    WHERE id = ANY($3::number[])
+  `;
+
+  const result = await db.query(query, [coderstatus, timestamp, uniquecodeIds]);
 
   return result.rowCount;
 };

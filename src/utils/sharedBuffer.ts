@@ -1,3 +1,8 @@
+export type QueueItem = {
+  id: number;
+  uniquecode: string;
+};
+
 export class SharedQueue {
   private buffer: SharedArrayBuffer;
   private view: Uint8Array;
@@ -13,7 +18,7 @@ export class SharedQueue {
 
   constructor(
     bufferOrCapacity: SharedArrayBuffer | number,
-    maxStringLength: number = 20
+    maxStringLength: number = 100
   ) {
     if (typeof bufferOrCapacity === "number") {
       // Initialize with new buffer
@@ -58,11 +63,32 @@ export class SharedQueue {
     Atomics.store(this.indexView, this.lockIndex, 0);
   }
 
+  private exists(value: string): boolean {
+    const encoder = new TextEncoder();
+    const encodedValue = encoder.encode(value);
+
+    const head = Atomics.load(this.indexView, this.headIndex);
+    const tail = Atomics.load(this.indexView, this.tailIndex);
+
+    for (let i = head; i !== tail; i = (i + 1) % this.capacity) {
+      const start = i * this.itemSize;
+      const encodedItem = this.view.slice(start, start + this.maxStringLength);
+      const itemValue = new TextDecoder()
+        .decode(encodedItem)
+        .replace(/\0/g, "");
+      if (itemValue === value) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   getBuffer(): SharedArrayBuffer {
     return this.buffer;
   }
 
-  push(...values: string[]): boolean {
+  push(...values: QueueItem[]): boolean {
     const encoder = new TextEncoder();
     let enqueueCount = 0;
 
@@ -72,8 +98,14 @@ export class SharedQueue {
     let tail = Atomics.load(this.indexView, this.tailIndex);
 
     for (const value of values) {
+      const item = `${value.id}:${value.uniquecode}`;
+
+      if (this.exists(item)) {
+        continue; // Skip if the item already exists
+      }
+
       enqueueCount++;
-      const encodedValue = encoder.encode(value);
+      const encodedValue = encoder.encode(item);
 
       if (encodedValue.length > this.maxStringLength) {
         this.releaseLock();
@@ -115,12 +147,12 @@ export class SharedQueue {
     return size;
   }
 
-  getAll(): string[] {
+  getAll(): QueueItem[] {
     while (!this.acquireLock());
 
     const head = Atomics.load(this.indexView, this.headIndex);
     const tail = Atomics.load(this.indexView, this.tailIndex);
-    const items: string[] = [];
+    const items: QueueItem[] = [];
 
     for (let i = head; i !== tail; i = (i + 1) % this.capacity) {
       const start = i * this.itemSize;
@@ -129,7 +161,8 @@ export class SharedQueue {
       // Decode the string
       const decoder = new TextDecoder();
       const value = decoder.decode(encodedValue).replace(/\0/g, "");
-      items.push(value);
+      const [id, uniquecode] = value.split(":");
+      items.push({ id: Number(id), uniquecode });
     }
 
     this.releaseLock();
@@ -137,7 +170,7 @@ export class SharedQueue {
     return items;
   }
 
-  shift(): string | null {
+  shift(): QueueItem | null {
     while (!this.acquireLock());
 
     const head = Atomics.load(this.indexView, this.headIndex);
@@ -155,15 +188,16 @@ export class SharedQueue {
     Atomics.store(this.indexView, this.headIndex, (head + 1) % this.capacity);
     this.releaseLock();
 
-    return value;
+    const [id, uniquecode] = value.split(":");
+    return { id: Number(id), uniquecode };
   }
 
-  shiftAll(): string[] {
+  shiftAll(): QueueItem[] {
     while (!this.acquireLock());
 
     const head = Atomics.load(this.indexView, this.headIndex);
     const tail = Atomics.load(this.indexView, this.tailIndex);
-    const items: string[] = [];
+    const items: QueueItem[] = [];
 
     if (head !== tail) {
       let current = head;
@@ -174,7 +208,10 @@ export class SharedQueue {
           start + this.maxStringLength
         );
         const value = new TextDecoder().decode(encodedValue).replace(/\0/g, "");
-        items.push(value);
+
+        const [id, uniquecode] = value.split(":");
+        items.push({ id: Number(id), uniquecode });
+
         current = (current + 1) % this.capacity;
       } while (current !== tail);
 

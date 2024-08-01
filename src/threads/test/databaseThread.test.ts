@@ -3,16 +3,14 @@ import {
   getUniquecodes,
   setBulkPrintedStatus,
 } from "../../services/uniquecodes";
-import { sleep } from "../../utils/helper";
 import { SharedPrimitive, SharedQueue } from "../../utils/sharedBuffer";
+import { sleep } from "../../utils/helper";
 
-// Mock dependencies
+// Only mock the database services
 jest.mock("../../services/uniquecodes");
-jest.mock("../../utils/helper");
 jest.mock("threads", () => ({
   expose: () => {},
 }));
-// jest.mock('../../utils/sharedBuffer');
 
 const mockedGetUniquecodes = getUniquecodes as jest.MockedFunction<
   typeof getUniquecodes
@@ -20,93 +18,130 @@ const mockedGetUniquecodes = getUniquecodes as jest.MockedFunction<
 const mockedSetBulkPrintedStatus = setBulkPrintedStatus as jest.MockedFunction<
   typeof setBulkPrintedStatus
 >;
-const mockedSleep = sleep as jest.MockedFunction<typeof sleep>;
 
 describe("DatabaseThread", () => {
   let databaseThread: DatabaseThread;
-  let mockIsPrinting: SharedPrimitive<boolean>;
-  let mockPrintQueue: SharedQueue;
-  let mockPrintedQueue: SharedQueue;
+  let isPrinting: SharedPrimitive<boolean>;
+  let printQueue: SharedQueue;
+  let printedQueue: SharedQueue;
+  let DBUpdateQueue: SharedQueue;
 
   beforeEach(() => {
     jest.resetAllMocks();
 
-    // Create mock instances
-    mockIsPrinting = new SharedPrimitive<boolean>(false);
-    mockPrintQueue = new SharedQueue(100);
-    mockPrintedQueue = new SharedQueue(100);
+    // Create actual SharedPrimitive and SharedQueue instances
+    isPrinting = new SharedPrimitive<boolean>(false);
+    printQueue = new SharedQueue(400);
+    printedQueue = new SharedQueue(400);
+    DBUpdateQueue = new SharedQueue(400);
 
     // Import the module dynamically to reset the module state
     jest.isolateModules(() => {
       databaseThread = require("../databaseThread").databaseThread;
     });
 
-    // Initialize the thread
+    // Initialize the thread with real shared buffers
     databaseThread.init({
-      isPrintBuffer: mockIsPrinting.getBuffer(),
-      printBuffer: mockPrintQueue.getBuffer(),
-      printedBuffer: mockPrintedQueue.getBuffer(),
+      isPrintBuffer: isPrinting.getBuffer(),
+      printBuffer: printQueue.getBuffer(),
+      printedBuffer: printedQueue.getBuffer(),
+      DBUpdateBuffer: DBUpdateQueue.getBuffer(),
     });
   });
 
-  describe("run", () => {
-    it("should exit when isPrinting is false", async () => {
-      mockIsPrinting.get = jest.fn().mockReturnValue(false);
-      await databaseThread.run();
-      expect(mockedSleep).not.toHaveBeenCalled();
-    });
+  it("should exit when isPrinting is false", async () => {
+    isPrinting.set(false);
+    await databaseThread.run();
 
-    it("should update buffer when printedQueue has items", async () => {
-      mockIsPrinting.get = jest
-        .fn()
-        .mockReturnValueOnce(true)
-        .mockReturnValueOnce(false);
-      mockPrintedQueue.size = jest.fn().mockReturnValue(1);
-      mockPrintedQueue.shiftAll = jest.fn().mockReturnValue(["code1"]);
-
-      await databaseThread.run();
-
-      expect(mockedSetBulkPrintedStatus).toHaveBeenCalledWith(
-        ["code1"],
-        expect.any(Date)
-      );
-    });
-
-    it.only("should populate buffer when printQueue is below MIN_QUEUE", async () => {
-      mockIsPrinting.get = jest
-        .fn()
-        .mockReturnValueOnce(true)
-        .mockReturnValueOnce(false);
-      mockPrintQueue.size = jest.fn().mockReturnValue(5); // Below MIN_QUEUE (10)
-      mockedGetUniquecodes.mockResolvedValue([{ uniquecode: "new_code" }]);
-
-      await databaseThread.run();
-
-      expect(mockedGetUniquecodes).toHaveBeenCalled();
-      expect(mockPrintQueue.push).toHaveBeenCalledWith("new_code");
-    });
+    expect(mockedGetUniquecodes).not.toHaveBeenCalled();
+    expect(mockedSetBulkPrintedStatus).not.toHaveBeenCalled();
   });
 
-  describe("populateBuffer", () => {
-    it("should return an array of uniquecodes", async () => {
-      mockedGetUniquecodes.mockResolvedValue([
-        { uniquecode: "code1" },
-        { uniquecode: "code2" },
-      ]);
+  it("should exit when isPrinting is false and update if item exist", async () => {
+    isPrinting.set(false);
+    DBUpdateQueue.push(
+      { id: 1000004, uniquecode: "00004" },
+      { id: 1000005, uniquecode: "00005" }
+    );
+    printQueue.push(
+      ...Array.from(new Array(50), (_, index) => ({
+        id: 1000000 + index + 1,
+        uniquecode: `CODE${index + 1}`,
+      }))
+    );
 
-      const result = await databaseThread.populateBufer(2);
+    await databaseThread.run();
 
-      expect(result).toEqual(["code1", "code2"]);
-      expect(mockedGetUniquecodes).toHaveBeenCalledWith(2);
-    });
+    expect(mockedGetUniquecodes).not.toHaveBeenCalled();
+    expect(mockedSetBulkPrintedStatus).toHaveBeenCalled();
+    expect(mockedSetBulkPrintedStatus).toHaveBeenCalledWith(
+      [1000004, 1000005],
+      expect.any(Date)
+    );
+  });
 
-    it("should return an empty array if getUniquecodes fails", async () => {
-      mockedGetUniquecodes.mockResolvedValue([]);
+  it("should update buffer when DBUpdateQueue has items", async () => {
+    isPrinting.set(true);
+    DBUpdateQueue.push(
+      { id: 1000004, uniquecode: "00004" },
+      { id: 1000005, uniquecode: "00005" }
+    );
+    printQueue.push(
+      ...Array.from(new Array(200), (_, index) => ({
+        id: 1000000 + index + 1,
+        uniquecode: `CODE${index + 1}`,
+      }))
+    );
 
-      const result = await databaseThread.populateBufer(2);
+    const runPromise = databaseThread.run();
 
-      expect(result).toEqual([]);
-      expect(mockedGetUniquecodes).toHaveBeenCalledWith(2);
-    });
+    // Wait a short time to allow the function to process
+    await sleep(1);
+
+    isPrinting.set(false);
+
+    await runPromise;
+
+    expect(mockedGetUniquecodes).not.toHaveBeenCalled();
+    expect(mockedSetBulkPrintedStatus).toHaveBeenCalled();
+    expect(mockedSetBulkPrintedStatus).toHaveBeenCalledWith(
+      [1000004, 1000005],
+      expect.any(Date)
+    );
+  });
+
+  it("should populate buffer when printQueue is below MIN_QUEUE", async () => {
+    const rawQueueData = Array.from(new Array(50), (_, index) => ({
+      id: 1000000 + index + 1,
+      uniquecode: `CODE${index + 1}`,
+    }));
+    isPrinting.set(true);
+    DBUpdateQueue.push(
+      { id: 1000004, uniquecode: "00004" },
+      { id: 1000005, uniquecode: "00005" }
+    );
+    printQueue.push(...rawQueueData);
+
+    mockedGetUniquecodes.mockResolvedValue([
+      { id: 1111000, uniquecode: "NEW_CODE" },
+    ]);
+
+    expect(printQueue.size()).toBe(rawQueueData.length);
+
+    const runPromise = databaseThread.run();
+
+    // Wait a short time to allow the function to process
+    await sleep(1);
+
+    isPrinting.set(false);
+
+    await runPromise;
+
+    expect(mockedGetUniquecodes).toHaveBeenCalled();
+    expect(printQueue.size()).toEqual(rawQueueData.length + 1);
+    expect(printQueue.getAll()).toEqual([
+      ...rawQueueData,
+      { id: 1111000, uniquecode: "NEW_CODE" },
+    ]);
   });
 });
