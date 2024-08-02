@@ -50,6 +50,7 @@ export default class LiebingerClass {
   // Method to execute a command and validate the response
   public async executeCommand(command: string) {
     try {
+      console.log("call actual command", command);
       const response = this.connection.write(command, (err) => {
         if (err) return;
         return true;
@@ -65,10 +66,10 @@ export default class LiebingerClass {
     return this.connection.write(data, cb);
   }
 
-  public onData(listener: (data: string) => void) {
+  public onData(listener: (data: string) => void | Promise<void>) {
     this.connection.onData(listener);
   }
-  public offData(listener: (data: any) => void) {
+  public offData(listener: (data: any) => void | Promise<void>) {
     this.connection.offData(listener);
   }
 
@@ -128,38 +129,3 @@ export default class LiebingerClass {
     return this.executeCommand(command);
   }
 }
-
-// Helper method to parse the check printer status response
-export const parseCheckPrinterStatus = (response: string) => {
-  // Parse the response
-  const parts = response.split(/\s+/);
-  return {
-    response,
-    nozzleState: parseInt(parts[0].slice(-1), 10),
-    machineState: parseInt(parts[1], 10),
-    errorState: parseInt(parts[2], 10),
-    headCover: parseInt(parts[3], 10),
-    actSpeed: parseInt(parts[5], 10),
-  };
-};
-
-// Helper method to parse the check mailing status response
-export const parseCheckMailingStatus = (response: string) => {
-  // Description of responses
-  // FifoDepth                      = Available batch depth of the Mailing Fifos. (Normally 256 records)
-  // FifoEntrys                     = Number of mail records which are available in the mailing Fifo
-  // LastStartedPrintNo             = No.of the mail record which’s print has already started (0 =if no one is available)
-  // StopAtNo                       = Record number where a print stop is generated (=Value which has been set before with ^0=CM )
-  // LastStartedPrintNoWasFinished  = Flag (If = 0, the last print was started, but not finished, if >0, the last print was finished, but the next one for sure not started)
-
-  // Parse the response
-  const parts = response.split(/\s+/);
-  return {
-    response,
-    fifoDepth: parseInt(parts[0].slice(-1), 10),
-    fifoEntries: parseInt(parts[1], 10),
-    lastStartedPrintNo: parseInt(parts[2], 10),
-    stopAtNo: parseInt(parts[3], 10),
-    lastStartedPrintNoWasFinished: parseInt(parts[5], 10),
-  };
-};

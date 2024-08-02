@@ -1,7 +1,8 @@
-import { DatabaseThread } from "../databaseThread";
+import type { DatabaseThread } from "../databaseThread";
 import {
   getUniquecodes,
   setBulkPrintedStatus,
+  resetBulkBuffered,
 } from "../../services/uniquecodes";
 import { SharedPrimitive, SharedQueue } from "../../utils/sharedBuffer";
 import { sleep } from "../../utils/helper";
@@ -17,6 +18,9 @@ const mockedGetUniquecodes = getUniquecodes as jest.MockedFunction<
 >;
 const mockedSetBulkPrintedStatus = setBulkPrintedStatus as jest.MockedFunction<
   typeof setBulkPrintedStatus
+>;
+const mockedResetBulkBuffered = resetBulkBuffered as jest.MockedFunction<
+  typeof resetBulkBuffered
 >;
 
 describe("DatabaseThread", () => {
@@ -57,17 +61,19 @@ describe("DatabaseThread", () => {
     expect(mockedSetBulkPrintedStatus).not.toHaveBeenCalled();
   });
 
+  it("should exit and not get new uniquecodes when isPrinting is false", async () => {
+    isPrinting.set(false);
+    await databaseThread.run();
+
+    expect(mockedGetUniquecodes).not.toHaveBeenCalled();
+    expect(mockedSetBulkPrintedStatus).not.toHaveBeenCalled();
+  });
+
   it("should exit when isPrinting is false and update if item exist", async () => {
     isPrinting.set(false);
     DBUpdateQueue.push(
       { id: 1000004, uniquecode: "00004" },
       { id: 1000005, uniquecode: "00005" }
-    );
-    printQueue.push(
-      ...Array.from(new Array(50), (_, index) => ({
-        id: 1000000 + index + 1,
-        uniquecode: `CODE${index + 1}`,
-      }))
     );
 
     await databaseThread.run();
@@ -132,16 +138,84 @@ describe("DatabaseThread", () => {
 
     // Wait a short time to allow the function to process
     await sleep(1);
-
-    isPrinting.set(false);
-
-    await runPromise;
-
     expect(mockedGetUniquecodes).toHaveBeenCalled();
     expect(printQueue.size()).toEqual(rawQueueData.length + 1);
     expect(printQueue.getAll()).toEqual([
       ...rawQueueData,
       { id: 1111000, uniquecode: "NEW_CODE" },
     ]);
+
+    isPrinting.set(false);
+
+    await runPromise;
+  });
+
+  it("should exit and reset uniquecodes left in printed queue when isPrinting is false", async () => {
+    const rawPrintedQueueData = Array.from(new Array(50), (_, index) => ({
+      id: 1000000 + index + 1,
+      uniquecode: `CODE${index + 1}`,
+    }));
+    printedQueue.push(...rawPrintedQueueData);
+
+    expect(printedQueue.size()).toBe(rawPrintedQueueData.length);
+
+    isPrinting.set(false);
+    await databaseThread.run();
+
+    expect(mockedGetUniquecodes).not.toHaveBeenCalled();
+    expect(mockedResetBulkBuffered).toHaveBeenCalled();
+    expect(mockedResetBulkBuffered).toHaveBeenCalledWith(
+      rawPrintedQueueData.map((uc) => uc.id)
+    );
+    expect(printedQueue.size()).toBe(0);
+  });
+
+  it("should exit and reset uniquecodes left in print queue when isPrinting is false", async () => {
+    const rawPrintQueueData = Array.from(new Array(100), (_, index) => ({
+      id: 1000000 + index + 1,
+      uniquecode: `CODE${index + 1}`,
+    }));
+    printQueue.push(...rawPrintQueueData);
+
+    expect(printQueue.size()).toBe(rawPrintQueueData.length);
+
+    isPrinting.set(false);
+    await databaseThread.run();
+
+    expect(mockedGetUniquecodes).not.toHaveBeenCalled();
+    expect(mockedResetBulkBuffered).toHaveBeenCalled();
+    expect(mockedResetBulkBuffered).toHaveBeenCalledWith(
+      rawPrintQueueData.map((uc) => uc.id)
+    );
+    expect(printQueue.size()).toBe(0);
+  });
+
+  it("should exit and reset uniquecodes left in print and printed queue when isPrinting is false", async () => {
+    const rawPrintQueueData = Array.from(new Array(100), (_, index) => ({
+      id: 1000000 + index + 1,
+      uniquecode: `CODE${index + 1}`,
+    }));
+    printQueue.push(...rawPrintQueueData);
+
+    const rawPrintedQueueData = Array.from(new Array(50), (_, index) => ({
+      id: 1000000 + index + 1,
+      uniquecode: `CODE${index + 1}`,
+    }));
+    printedQueue.push(...rawPrintedQueueData);
+
+    expect(printQueue.size()).toBe(rawPrintQueueData.length);
+    expect(printedQueue.size()).toBe(rawPrintedQueueData.length);
+
+    isPrinting.set(false);
+    await databaseThread.run();
+
+    expect(mockedGetUniquecodes).not.toHaveBeenCalled();
+    expect(mockedResetBulkBuffered).toHaveBeenCalled();
+    expect(mockedResetBulkBuffered).toHaveBeenCalledWith([
+      ...rawPrintQueueData.map((uc) => uc.id),
+      ...rawPrintedQueueData.map((uc) => uc.id),
+    ]);
+    expect(printQueue.size()).toBe(0);
+    expect(printedQueue.size()).toBe(0);
   });
 });

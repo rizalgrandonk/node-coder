@@ -36,7 +36,7 @@ const serialConnection = new SerialConnection({
   },
 });
 
-// serialConnection.connect();
+serialConnection.connect();
 
 let updateInterval: NodeJS.Timeout | null = null;
 const MAX_QUEUE = Number(process.env.MAX_QUEUE ?? 254);
@@ -63,9 +63,9 @@ const startPrintProcess = async () => {
   const databaseThread = await spawn<DatabaseThread>(
     new ThreadWorker("./threads/databaseThread")
   );
-  // const printerThread = await spawn<PrinterThread>(
-  //   new ThreadWorker("./threads/printerThread")
-  // );
+  const printerThread = await spawn<PrinterThread>(
+    new ThreadWorker("./threads/printerThread")
+  );
 
   await databaseThread.init({
     isPrintBuffer: isPrinting.getBuffer(),
@@ -74,14 +74,14 @@ const startPrintProcess = async () => {
     DBUpdateBuffer: DBUpdateQueue.getBuffer(),
   });
 
-  // await printerThread.init({
-  //   isPrintBuffer: isPrinting.getBuffer(),
-  //   printBuffer: printQueue.getBuffer(),
-  //   printedBuffer: printedQueue.getBuffer(),
-  //   DBUpdateBuffer: DBUpdateQueue.getBuffer(),
-  //   printCounterBuffer: printerCounter.getBuffer(),
-  //   displayMessageBuffer: displayMessage.getBuffer(),
-  // });
+  await printerThread.init({
+    isPrintBuffer: isPrinting.getBuffer(),
+    printBuffer: printQueue.getBuffer(),
+    printedBuffer: printedQueue.getBuffer(),
+    DBUpdateBuffer: DBUpdateQueue.getBuffer(),
+    printCounterBuffer: printerCounter.getBuffer(),
+    displayMessageBuffer: displayMessage.getBuffer(),
+  });
 
   const uniquecodes = await databaseThread.populateBufer(MAX_QUEUE);
   if (!uniquecodes) {
@@ -93,17 +93,27 @@ const startPrintProcess = async () => {
   printQueue.push(...uniquecodes);
 
   const databaseThreadRun = databaseThread.run().catch((err) => {
-    console.log("Error Socket Run", err);
+    console.log("Error Database Thread", err);
     isPrinting.set(false);
   });
-  // const printerThreadRun = printerThread.run().catch((err) => {
-  //   console.log("Error Socket Run", err);
-  //   isPrinting.set(false);
-  // });
 
-  // const serialPLCRun = runSerialPLC();
+  const printerThreadRun = printerThread.run().catch((err) => {
+    console.log("Error Printer Thread", err);
+    isPrinting.set(false);
+  });
+
+  const serialPLCRun = runSerialPLC();
 
   updateInterval = setInterval(async () => {
+    process.stdout.write("\x1Bc");
+    console.log({
+      isPrintBuffer: isPrinting.get(),
+      printBuffer: printQueue.size(),
+      printedBuffer: printedQueue.size(),
+      DBUpdateBuffer: DBUpdateQueue.size(),
+      printCounterBuffer: printerCounter.get(),
+      displayMessageBuffer: displayMessage.get(),
+    });
     if (!isPrinting.get()) {
       isPrinting.set(false);
       timeAfterPrinting = performance.now();
@@ -116,7 +126,7 @@ const startPrintProcess = async () => {
     const timeDiff = timeAfter - timeBefore;
     const printDiff = timeAfterPrinting - timeBefore;
     console.log(`Printing process complete in ${printDiff} ms`);
-    console.log({ printQueue: printQueue.size() });
+    console.log({ printedQueue: printedQueue.getAll() });
 
     console.log(
       `Finished processing ${printedQueue.size()} uniquecodes in ${timeDiff} ms`
@@ -124,9 +134,11 @@ const startPrintProcess = async () => {
 
     console.log(`Update delay for ${timeAfter - timeAfterPrinting}`);
 
+    await printerThreadRun;
     await databaseThreadRun;
-    // await serialPLCRun;
+    await serialPLCRun;
     await Thread.terminate(databaseThread);
+    await Thread.terminate(printerThread);
 
     if (updateInterval) clearInterval(updateInterval);
     io.emit("printComplete", {

@@ -51,6 +51,21 @@ export const getUniquecodes: (
   return result.rows;
 };
 
+export const resetBulkBuffered = async (uniquecodeIds: number[]) => {
+  const query = `
+    UPDATE uniquecode
+    SET printed=null, productid =null, 
+    batchid =null, buffered=null, 
+    sendconfirmed =null, coderstatus=null, 
+    printerlineid=null, markingprinterid =null
+    WHERE id=ANY($1::integer[])
+  `;
+
+  const result = await db.query(query, [uniquecodeIds]);
+
+  return result.rowCount;
+};
+
 export const setBulkPrintedStatus = async (
   uniquecodeIds: number[],
   timestamp: Date
@@ -59,7 +74,7 @@ export const setBulkPrintedStatus = async (
   const query = `
     UPDATE uniquecode
     SET coderstatus=$1, printed=$2
-    WHERE id = ANY($3::number[])
+    WHERE id = ANY($3::integer[])
   `;
 
   const result = await db.query(query, [coderstatus, timestamp, uniquecodeIds]);
@@ -75,7 +90,7 @@ export const setBulkUNEStatus = async (
   const query = `
     UPDATE uniquecode
     SET coderstatus=$1
-    WHERE id = ANY($3::number[])
+    WHERE id = ANY($3::integer[])
   `;
 
   const result = await db.query(query, [coderstatus, timestamp, uniquecodeIds]);

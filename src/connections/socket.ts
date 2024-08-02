@@ -1,4 +1,5 @@
 import net from "net";
+import { ReadlineParser } from "@serialport/parser-readline";
 
 type WriteAndResponseConfig = {
   responseValidation?: string | ((res: string) => boolean);
@@ -10,11 +11,15 @@ export default class SocketConnection {
   private configTCP: net.SocketConnectOpts;
   private client: net.Socket;
   private intervalConnect?: NodeJS.Timeout;
+  private parser: ReadlineParser;
 
   constructor(config: net.SocketConnectOpts) {
     this.configTCP = config;
     this.client = new net.Socket();
     this.intervalConnect = undefined;
+
+    this.parser = new ReadlineParser({ delimiter: "\r" });
+    this.client.pipe(this.parser);
 
     this.client.on("connect", this.handleConnect.bind(this));
     this.client.on("error", this.handleError.bind(this));
@@ -109,7 +114,7 @@ export default class SocketConnection {
   }
 
   public onData(listener: (data: string) => void) {
-    this.client.on("data", (val) => {
+    return this.parser.on("data", (val: Buffer) => {
       listener(val.toString());
     });
   }

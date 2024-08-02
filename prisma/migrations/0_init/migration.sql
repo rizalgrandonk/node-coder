@@ -1,3 +1,4 @@
+-- SQLBook: Code
 -- CreateTable
 CREATE TABLE "ad_user" (
     "ad_user_id" DECIMAL(10,0) NOT NULL,

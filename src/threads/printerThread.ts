@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { expose } from "threads/worker";
+import { expose } from "threads";
 import { Observable, Subject } from "threads/observable";
 import { sleep } from "../utils/helper";
 import { SharedPrimitive, SharedQueue } from "../utils/sharedBuffer";
@@ -7,11 +7,13 @@ import SocketConnection from "../connections/socket";
 import LiebingerClass, {
   MACHINE_STATE,
   NOZZLE_STATE,
-  parseCheckMailingStatus,
-  parseCheckPrinterStatus,
 } from "../actions/leibinger";
 import { setBulkUNEStatus } from "../services/uniquecodes";
 import * as ErrorCodeService from "../services/errorcode";
+import {
+  parseCheckMailingStatus,
+  parseCheckPrinterStatus,
+} from "../utils/leibinger";
 
 console.log("Printer Thread Spawned");
 const printer = new LiebingerClass({
@@ -29,6 +31,7 @@ let printQueue: SharedQueue;
 let printedQueue: SharedQueue;
 let DBUpdateQueue: SharedQueue;
 let isFirstRun: boolean = false;
+let lastUpdate: boolean = false;
 
 type InitParams = {
   isPrintBuffer: SharedArrayBuffer;
@@ -54,49 +57,59 @@ const init = ({
   DBUpdateQueue = new SharedQueue(DBUpdateBuffer);
 };
 
-const run = async () => {
-  await printer.resetCounter();
-  await printer.checkPrinterStatus();
+const listenPrinterResponse = async () => {
+  return await new Promise<void>((resolve) => {
+    printer.onData(async (printerResponse: string) => {
+      if (!printerResponse.startsWith("^0")) {
+        clientDisplayMessage.set(printerResponse);
+        if (printedQueue.size() > 0) {
+          // Flush Printed Queue
+          const deletedQueue = printedQueue.shiftAll();
+
+          // Update uniquecode SET coderstatus = 'UNE'
+          const deletedQueueIds = deletedQueue.map((item) => item.id);
+          await setBulkUNEStatus(deletedQueueIds, new Date());
+        }
+        // TODO: Send Error Code To PLC
+        // DO NOT SEND ANY COMMAND
+        return;
+      }
+
+      // Check if response length is not more than 5
+      if (printerResponse.length < 5) {
+        // DO NOT SEND ANY COMMAND
+        return;
+      }
+
+      // Handle as printer status
+      if (printerResponse.startsWith("^0=RS")) {
+        await handlePrinterStatus(printerResponse);
+      }
+
+      // Handle as mailing status
+      if (printerResponse.startsWith("^0=SM")) {
+        await handleMailingStatus(printerResponse);
+        if (lastUpdate) {
+          resolve();
+        }
+      }
+    });
+  });
 };
 
-const batchStart = async () => {
+const run = async () => {
   await printer.resetCounter();
+  printCounter.set(0);
 
   // set first run to true
   isFirstRun = true;
+
+  const listener = listenPrinterResponse();
+
+  await printer.checkPrinterStatus();
+
+  await listener;
 };
-
-printer.onData(async (printerResponse: string) => {
-  console.log("printerResponse", { printerResponse });
-  if (!printerResponse.startsWith("^0")) {
-    clientDisplayMessage.set(printerResponse);
-    if (printedQueue.size() > 0) {
-      // Flush Printed Queue
-      const deletedQueue = printedQueue.shiftAll();
-
-      // Update uniquecode SET coderstatus = 'UNE'
-      const deletedQueueIds = deletedQueue.map((item) => item.id);
-      await setBulkUNEStatus(deletedQueueIds, new Date());
-    }
-    // TODO: Send Error Code To PLC
-    return;
-  }
-
-  // Check if response length is not more than 5
-  if (printerResponse.length < 5) {
-    return;
-  }
-
-  // Handle as printer status
-  if (printerResponse.startsWith("^0=RS")) {
-    handlePrinterStatus(printerResponse);
-  }
-
-  // Handle as printer status
-  if (printerResponse.startsWith("^0=SM")) {
-    handleMailingStatus(printerResponse);
-  }
-});
 
 const incrementPrintCounter = () => {
   const currentPrintCounter = printCounter.get() + 1;
@@ -112,15 +125,24 @@ const handlePrinterStatus = async (printerResponse: string) => {
   // If there is no print action initiated from client
   if (!isPrinting.get()) {
     clientDisplayMessage.set("STOP PRINTING");
+
+    // Stop Printer Status
     if (machineState === MACHINE_STATE.STARTED) {
       await printer.stopPrint();
       await printer.checkPrinterStatus();
-    } else {
+    }
+
+    // End Printing Process
+    else {
       await printer.showDisplay();
 
       // Mask the current printer display
       const currentPrintCounter = incrementPrintCounter();
       printer.appendFifo(currentPrintCounter, "XXXXXXXXXX");
+
+      /** --- PRINTING ENDED --- */
+      lastUpdate = true;
+      await printer.checkMailingStatus();
     }
   }
 
@@ -176,6 +198,7 @@ const handlePrinterStatus = async (printerResponse: string) => {
   else if (machineState === 6 && isFirstRun) {
     await printer.flushFIFO();
     await printer.hideDisplay();
+    await printer.checkPrinterStatus();
     isFirstRun = false;
   }
 
@@ -203,6 +226,10 @@ const handleMailingStatus = async (printerResponse: string) => {
     }
   }
 
+  if (lastUpdate) {
+    return;
+  }
+
   // Create Unique Code Command
   const sendUniqueCodeCommand: string[] = [];
   if (printQueue.size() > 0 && refillCount > 0) {
@@ -213,21 +240,21 @@ const handleMailingStatus = async (printerResponse: string) => {
       }
       printedQueue.push(deletedPrint);
       const currentPrintCounter = incrementPrintCounter();
-      const command = `^0=MR${currentPrintCounter}\t${deletedPrint}`;
+      const command = `^0=MR${currentPrintCounter}\t${deletedPrint.uniquecode}`;
       sendUniqueCodeCommand.push(command);
     }
   }
 
   // Send Unique Code Command To Printer
   if (sendUniqueCodeCommand.length > 0) {
-    await printer.executeCommand(sendUniqueCodeCommand.join("\r"));
+    await printer.executeCommand(sendUniqueCodeCommand.join("\r") + "\r\n");
   }
 };
 
-const printerThread = {
+export const printerThread = {
   init,
   run,
-  batchStart,
+  listenPrinterResponse,
 };
 
 export type PrinterThread = typeof printerThread;

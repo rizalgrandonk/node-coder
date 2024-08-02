@@ -1,5 +1,9 @@
 import { expose } from "threads";
-import { getUniquecodes, setBulkPrintedStatus } from "../services/uniquecodes";
+import {
+  getUniquecodes,
+  resetBulkBuffered,
+  setBulkPrintedStatus,
+} from "../services/uniquecodes";
 import { chunkArray, sleep } from "../utils/helper";
 import { QueueItem, SharedPrimitive, SharedQueue } from "../utils/sharedBuffer";
 
@@ -31,17 +35,31 @@ const init = ({
 };
 
 const run = async () => {
-  while (true) {
+  while (
+    isPrinting.get() ||
+    DBUpdateQueue.size() > 0 ||
+    printQueue.size() > 0 ||
+    printedQueue.size() > 0
+  ) {
+    // console.log("DB LOOP", {
+    //   DBUpdateQueue: DBUpdateQueue.size(),
+    //   printQueue: printQueue.size(),
+    // });
     if (DBUpdateQueue.size() > 0) {
       await updateBuffer(DBUpdateQueue.shiftAll());
     }
     if (!isPrinting.get()) {
-      return;
+      if (printQueue.size() > 0 || printedQueue.size() > 0) {
+        await resetBuffer([
+          ...printQueue.shiftAll(),
+          ...printedQueue.shiftAll(),
+        ]);
+      }
     }
 
     const emptySlot = MAX_QUEUE - printQueue.size();
 
-    if (emptySlot > 0 && printQueue.size() <= MIN_QUEUE) {
+    if (isPrinting.get() && emptySlot > 0 && printQueue.size() <= MIN_QUEUE) {
       const newUniquecodes = await populateBufer(emptySlot);
       if (newUniquecodes) {
         printQueue.push(...newUniquecodes);
@@ -63,6 +81,13 @@ async function updateBuffer(DBUpdateQueue: QueueItem[]) {
         new Date()
       )
     )
+  );
+}
+
+async function resetBuffer(resetQueue: QueueItem[]) {
+  const chunks = chunkArray(resetQueue, 500);
+  await Promise.all(
+    chunks.map((codes) => resetBulkBuffered(codes.map((code) => code.id)))
   );
 }
 

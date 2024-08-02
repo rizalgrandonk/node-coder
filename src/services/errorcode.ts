@@ -1,9 +1,11 @@
 import db from "../db";
+
 type ErrorCode = {
   errorcode: string;
   errorname: string;
   description: string | null;
 };
+
 export const findByCode = async (code: string): Promise<ErrorCode[]> => {
   const result = await db.query(
     `SELECT * FROM errorcode WHERE errorcode = $1`,
