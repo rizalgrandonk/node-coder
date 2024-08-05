@@ -1,10 +1,13 @@
 import net from "net";
 import { ReadlineParser } from "@serialport/parser-readline";
+import EventEmitter from "events";
 
 type WriteAndResponseConfig = {
   responseValidation?: string | ((res: string) => boolean);
   timeout?: number;
 };
+
+type ConnectionStatus = "connect" | "error" | "close" | "end";
 
 export default class SocketConnection {
   public type = "socket";
@@ -12,6 +15,10 @@ export default class SocketConnection {
   private client: net.Socket;
   private intervalConnect?: NodeJS.Timeout;
   private parser: ReadlineParser;
+  private connectionEvent = new EventEmitter<{
+    change: [status: ConnectionStatus, error?: Error];
+  }>();
+  public connectionStatus: ConnectionStatus = "close";
 
   constructor(config: net.SocketConnectOpts) {
     this.configTCP = config;
@@ -23,8 +30,16 @@ export default class SocketConnection {
 
     this.client.on("connect", this.handleConnect.bind(this));
     this.client.on("error", this.handleError.bind(this));
-    this.client.on("close", this.launchIntervalConnect.bind(this));
-    this.client.on("end", this.launchIntervalConnect.bind(this));
+    this.client.on("close", () => {
+      this.connectionStatus = "close";
+      this.connectionEvent.emit("change", "close");
+      return this.launchIntervalConnect.bind(this);
+    });
+    this.client.on("end", () => {
+      this.connectionStatus = "end";
+      this.connectionEvent.emit("change", "end");
+      return this.launchIntervalConnect.bind(this);
+    });
 
     // this.connect();
   }
@@ -48,12 +63,16 @@ export default class SocketConnection {
   }
 
   private handleConnect() {
+    this.connectionStatus = "connect";
+    this.connectionEvent.emit("change", "connect");
     this.clearIntervalConnect();
     console.log("connected to server", "TCP");
   }
 
   private handleError(err: Error) {
     console.log(err.message, "TCP ERROR");
+    this.connectionStatus = "error";
+    this.connectionEvent.emit("change", "error", err);
     this.launchIntervalConnect();
   }
 
@@ -114,12 +133,23 @@ export default class SocketConnection {
   }
 
   public onData(listener: (data: string) => void) {
-    return this.parser.on("data", (val: Buffer) => {
+    this.parser.on("data", (val: Buffer) => {
       listener(val.toString());
     });
   }
   public offData(listener: (data: any) => void) {
-    this.client.on("data", listener);
+    this.client.off("data", listener);
+  }
+
+  public onConnectionChange(
+    listener: (status: ConnectionStatus, error?: Error) => void
+  ) {
+    return this.connectionEvent.on("change", listener);
+  }
+  public offConnectionChange(
+    listener: (status: ConnectionStatus, error?: Error) => void
+  ) {
+    return this.connectionEvent.off("change", listener);
   }
 }
 

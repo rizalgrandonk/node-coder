@@ -1,11 +1,14 @@
 import { ReadlineOptions, SerialPort, SerialPortOpenOptions } from "serialport";
 import { ReadlineParser } from "@serialport/parser-readline";
 import { AutoDetectTypes } from "@serialport/bindings-cpp";
+import EventEmitter from "events";
 
 export type SerialConnectionParameterType = {
   portOptions: SerialPortOpenOptions<AutoDetectTypes>;
   parserOptions: ReadlineOptions;
 };
+
+type ConnectionStatus = "connect" | "error" | "close" | "end";
 
 export default class SerialConnection {
   public type = "serial";
@@ -13,6 +16,10 @@ export default class SerialConnection {
   private parser: ReadlineParser;
   private intervalConnect: any;
   private timer: Date;
+  private connectionEvent = new EventEmitter<{
+    change: [status: ConnectionStatus, error?: Error];
+  }>();
+  public connectionStatus: ConnectionStatus = "close";
 
   constructor(config: SerialConnectionParameterType) {
     this.port = new SerialPort({
@@ -31,11 +38,21 @@ export default class SerialConnection {
 
     this.port.on("error", (err) => {
       console.log(err, "Serial ERROR");
+      this.connectionStatus = "error";
+      this.connectionEvent.emit("change", "error", err);
       this.launchIntervalConnect();
     });
 
-    this.port.on("close", this.launchIntervalConnect.bind(this));
-    this.port.on("end", this.launchIntervalConnect.bind(this));
+    this.port.on("close", () => {
+      this.connectionStatus = "close";
+      this.connectionEvent.emit("change", "close");
+      return this.launchIntervalConnect.bind(this);
+    });
+    this.port.on("end", () => {
+      this.connectionStatus = "end";
+      this.connectionEvent.emit("change", "end");
+      return this.launchIntervalConnect.bind(this);
+    });
 
     if (this.parser) {
       this.parser.on("data", (data) => {
@@ -58,11 +75,14 @@ export default class SerialConnection {
     console.log("ConnecRun");
     this.port.open((err) => {
       if (err) {
-        console.log(err, "Serial ERROR");
+        this.connectionStatus = "error";
+        this.connectionEvent.emit("change", "error", err);
         this.launchIntervalConnect();
         return;
       }
 
+      this.connectionStatus = "connect";
+      this.connectionEvent.emit("change", "connect");
       this.clearIntervalConnect();
       console.log("connected to server", "Serial");
     });
@@ -161,7 +181,18 @@ export default class SerialConnection {
     this.parser.on("data", listener);
   }
   public offData(listener: (data: any) => void) {
-    this.parser.on("data", listener);
+    this.parser.off("data", listener);
+  }
+
+  public onConnectionChange(
+    listener: (status: ConnectionStatus, error?: Error) => void
+  ) {
+    return this.connectionEvent.on("change", listener);
+  }
+  public offConnectionChange(
+    listener: (status: ConnectionStatus, error?: Error) => void
+  ) {
+    return this.connectionEvent.off("change", listener);
   }
 }
 // const port = new SerialPort({

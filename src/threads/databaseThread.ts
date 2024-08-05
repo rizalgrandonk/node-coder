@@ -41,10 +41,6 @@ const run = async () => {
     printQueue.size() > 0 ||
     printedQueue.size() > 0
   ) {
-    // console.log("DB LOOP", {
-    //   DBUpdateQueue: DBUpdateQueue.size(),
-    //   printQueue: printQueue.size(),
-    // });
     if (DBUpdateQueue.size() > 0) {
       await updateBuffer(DBUpdateQueue.shiftAll());
     }
@@ -68,7 +64,7 @@ const run = async () => {
       }
     }
 
-    await sleep(100);
+    await sleep(500);
   }
 };
 

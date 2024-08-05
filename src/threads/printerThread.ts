@@ -7,6 +7,7 @@ import SocketConnection from "../connections/socket";
 import LiebingerClass, {
   MACHINE_STATE,
   NOZZLE_STATE,
+  ConnectionStatus,
 } from "../actions/leibinger";
 import { setBulkUNEStatus } from "../services/uniquecodes";
 import * as ErrorCodeService from "../services/errorcode";
@@ -14,15 +15,36 @@ import {
   parseCheckMailingStatus,
   parseCheckPrinterStatus,
 } from "../utils/leibinger";
+import { isMainThread } from "worker_threads";
 
-console.log("Printer Thread Spawned");
-const printer = new LiebingerClass({
-  connectionType: "socket",
-  connectionConfig: {
-    host: "0.0.0.0",
-    port: 515,
-  },
-});
+// console.log("Printer Thread Spawned");
+
+const PRINTER_CONNECTION = process.env.PRINTER_CONNECTION
+  ? (process.env.PRINTER_CONNECTION as "socket" | "serial")
+  : "socket";
+
+const printer = new LiebingerClass(
+  PRINTER_CONNECTION === "socket"
+    ? {
+        connectionType: PRINTER_CONNECTION,
+        connectionConfig: {
+          host: process.env.SOCKET_HOST ?? "0.0.0.0",
+          port: Number(process.env.SOCKET_PORT ?? 515),
+        },
+      }
+    : {
+        connectionType: PRINTER_CONNECTION,
+        connectionConfig: {
+          portOptions: {
+            path: process.env.SOCKET_HOST ?? "",
+            baudRate: 115200,
+          },
+          parserOptions: {
+            delimiter: "\r\n",
+          },
+        },
+      }
+);
 
 let printCounter: SharedPrimitive<number>;
 let isPrinting: SharedPrimitive<boolean>;
@@ -30,7 +52,8 @@ let clientDisplayMessage: SharedPrimitive<string>;
 let printQueue: SharedQueue;
 let printedQueue: SharedQueue;
 let DBUpdateQueue: SharedQueue;
-let isFirstRun: boolean = false;
+let isFirstRun: boolean = true;
+let isFirstRefill: boolean = true;
 let lastUpdate: boolean = false;
 
 type InitParams = {
@@ -57,9 +80,67 @@ const init = ({
   DBUpdateQueue = new SharedQueue(DBUpdateBuffer);
 };
 
+const waitConnectionReady = async () => {
+  if (printer.getConnectionStatus() === "connect") {
+    return true;
+  }
+  await Promise.race([
+    new Promise((resolve) => {
+      const changeHandler = (status: ConnectionStatus, error?: Error) => {
+        console.log(
+          "printer.getConnectionStatus()",
+          printer.getConnectionStatus()
+        );
+        console.log("status", status);
+        if (status === "connect") {
+          printer.offConnectionChange(changeHandler);
+          resolve(true);
+        }
+      };
+      printer.onConnectionChange(changeHandler);
+    }),
+    new Promise((resolve) => {
+      const interval = setInterval(() => {
+        console.log(
+          "printer.getConnectionStatus()",
+          printer.getConnectionStatus()
+        );
+        if (printer.getConnectionStatus() === "connect") {
+          resolve(true);
+          clearInterval(interval);
+        }
+      }, 1000);
+    }),
+  ]);
+
+  return printer.getConnectionStatus() === "connect";
+};
+
 const listenPrinterResponse = async () => {
   return await new Promise<void>((resolve) => {
-    printer.onData(async (printerResponse: string) => {
+    const connectionChangeHandler = async (
+      status: ConnectionStatus,
+      err?: Error
+    ) => {
+      if (status === "close") {
+        console.log("Printer Connection Closed");
+        clientDisplayMessage.set("PRINTER CONNECTION CLOSED");
+      } else if (status === "error") {
+        console.log("Printer Connection Error");
+        clientDisplayMessage.set(`PRINTER CONNECTION ERROR : ${err}`);
+      } else if (status === "end") {
+        console.log("Printer Connection Ended");
+        clientDisplayMessage.set("PRINTER CONNECTION ENDED");
+      } else if (status === "connect") {
+        await printer.checkPrinterStatus();
+      }
+    };
+
+    const listenerHandler = async (printerResponse: string) => {
+      if (printer.getConnectionStatus() !== "connect") {
+        await waitConnectionReady();
+      }
+
       if (!printerResponse.startsWith("^0")) {
         clientDisplayMessage.set(printerResponse);
         if (printedQueue.size() > 0) {
@@ -90,23 +171,37 @@ const listenPrinterResponse = async () => {
       if (printerResponse.startsWith("^0=SM")) {
         await handleMailingStatus(printerResponse);
         if (lastUpdate) {
+          printer.offData(listenerHandler);
+          printer.offConnectionChange(connectionChangeHandler);
           resolve();
         }
       }
-    });
+    };
+
+    printer.onData(listenerHandler);
+
+    printer.onConnectionChange(connectionChangeHandler);
   });
 };
 
 const run = async () => {
-  await printer.resetCounter();
-  printCounter.set(0);
-
-  // set first run to true
-  isFirstRun = true;
-
+  console.log("PRINTER THREAD RUN");
   const listener = listenPrinterResponse();
 
+  if (printer.getConnectionStatus() !== "connect") {
+    await waitConnectionReady();
+  }
+
+  // Reset Counter On First Run
+  if (isFirstRun) {
+    await printer.resetCounter();
+    printCounter.set(0);
+  }
+
   await printer.checkPrinterStatus();
+
+  // set first run to true
+  lastUpdate = false;
 
   await listener;
 };
@@ -121,6 +216,8 @@ const incrementPrintCounter = () => {
 const handlePrinterStatus = async (printerResponse: string) => {
   const { machineState, errorState, nozzleState } =
     parseCheckPrinterStatus(printerResponse);
+
+  // console.log({ machineState, errorState, nozzleState, isFirstRun });
 
   // If there is no print action initiated from client
   if (!isPrinting.get()) {
@@ -137,8 +234,8 @@ const handlePrinterStatus = async (printerResponse: string) => {
       await printer.showDisplay();
 
       // Mask the current printer display
-      const currentPrintCounter = incrementPrintCounter();
-      printer.appendFifo(currentPrintCounter, "XXXXXXXXXX");
+      // const currentPrintCounter = incrementPrintCounter();
+      await printer.appendFifo(1, "XXXXXXXXXX");
 
       /** --- PRINTING ENDED --- */
       lastUpdate = true;
@@ -151,17 +248,23 @@ const handlePrinterStatus = async (printerResponse: string) => {
     const identifiedErrors = await ErrorCodeService.findByCode(
       errorState.toString()
     );
-    const skipableError = ErrorCodeService.skipableError.find(
+    const skipableError = ErrorCodeService.skipableError().find(
       (err) => err.errorcode === errorState.toString()
     );
+
+    // console.log({
+    //   identifiedErrors,
+    //   skipableError,
+    // });
+
     // Update Client Display Message if error is not identified
-    if (!identifiedErrors) {
+    if (identifiedErrors?.length <= 0) {
       clientDisplayMessage.set(`Unidentified Error Code: ${errorState}`);
     }
 
     // Update Client Display Message if error is not skipable error
-    else if (!skipableError) {
-      clientDisplayMessage.set(identifiedErrors[0].errorname);
+    else if (identifiedErrors?.length > 0 && !skipableError) {
+      clientDisplayMessage.set(identifiedErrors[0]?.errorname);
     }
 
     await printer.closeError();
@@ -171,7 +274,8 @@ const handlePrinterStatus = async (printerResponse: string) => {
   // Open Nozzle if nozzle is closed and update Client Display Message
   else if (
     nozzleState === NOZZLE_STATE.CLOSED ||
-    nozzleState === NOZZLE_STATE.CLOSING
+    nozzleState === NOZZLE_STATE.CLOSING ||
+    nozzleState === NOZZLE_STATE.INBETWEEN
   ) {
     await printer.openNozzle();
     clientDisplayMessage.set("OPENING NOZZLE");
@@ -195,30 +299,56 @@ const handlePrinterStatus = async (printerResponse: string) => {
   }
 
   // Flush FIFO and Hide Display if machine is started and on first run
-  else if (machineState === 6 && isFirstRun) {
+  else if (
+    nozzleState === NOZZLE_STATE.OPENED &&
+    machineState === MACHINE_STATE.STARTED &&
+    isFirstRun
+  ) {
     await printer.flushFIFO();
     await printer.hideDisplay();
-    await printer.checkPrinterStatus();
+    await printer.enableEchoMode();
+
     isFirstRun = false;
+    await printer.checkPrinterStatus();
   }
 
   // Check Mailing Status if machine is started and not on first run
-  else if (machineState === 6 && !isFirstRun) {
+  else if (
+    nozzleState === NOZZLE_STATE.OPENED &&
+    machineState === MACHINE_STATE.STARTED &&
+    !isFirstRun
+  ) {
     await printer.checkMailingStatus();
     await printer.checkPrinterStatus();
   }
 };
 
 const handleMailingStatus = async (printerResponse: string) => {
-  const { fifoEntries } = parseCheckMailingStatus(printerResponse);
+  const { fifoEntries, fifoDepth, lastStartedPrintNo } =
+    parseCheckMailingStatus(printerResponse);
+
   const maxPrintedQueueSize = Number(process.env.MAX_PRINTED_QUEUE ?? 60);
-  const refillCount = maxPrintedQueueSize - fifoEntries + 1;
+  const refillCount =
+    maxPrintedQueueSize - (fifoEntries + (isFirstRefill ? 0 : 1));
   const currentPrintedQueueSize = printedQueue.size();
+
+  // console.log({
+  //   fifoEntries,
+  //   fifoDepth,
+  //   lastStartedPrintNo,
+  //   maxPrintedQueueSize,
+  //   refillCount,
+  // });
+
+  if (lastUpdate) {
+    refillCount - 1;
+  }
 
   // Move Queue From Printed Queue To DB Update Queue
   if (currentPrintedQueueSize > 0) {
     for (let i = 0; i < refillCount; i++) {
       const deletedPrinted = printedQueue.shift();
+
       if (!deletedPrinted) {
         break;
       }
@@ -233,6 +363,7 @@ const handleMailingStatus = async (printerResponse: string) => {
   // Create Unique Code Command
   const sendUniqueCodeCommand: string[] = [];
   if (printQueue.size() > 0 && refillCount > 0) {
+    if (isFirstRefill) isFirstRefill = false;
     for (let i = 0; i < refillCount; i++) {
       const deletedPrint = printQueue.shift();
       if (!deletedPrint) {
@@ -259,4 +390,6 @@ export const printerThread = {
 
 export type PrinterThread = typeof printerThread;
 
-expose(printerThread);
+if (!isMainThread) {
+  expose(printerThread);
+}

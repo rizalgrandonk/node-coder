@@ -15,23 +15,25 @@ type Config =
       connectionConfig: SerialConnectionParameterType;
     };
 
-export const NOZZLE_STATE = {
-  INVALID: 0,
-  OPENING: 1,
-  OPENED: 2,
-  CLOSING: 3,
-  CLOSED: 4,
-  INBETWEEN: 5,
-};
+export type ConnectionStatus = "connect" | "error" | "close" | "end";
 
-export const MACHINE_STATE = {
-  INVALID_NOZZLE: 1,
-  INITIALIZING: 2,
-  INTERVAL: 3,
-  NEED_OPEN_NOZZLE: 4,
-  AVAILABLE_TO_START: 5,
-  STARTED: 6,
-};
+export enum NOZZLE_STATE {
+  INVALID = 0,
+  OPENING = 1,
+  OPENED = 2,
+  CLOSING = 3,
+  CLOSED = 4,
+  INBETWEEN = 5,
+}
+
+export enum MACHINE_STATE {
+  INVALID_NOZZLE = 1,
+  INITIALIZING = 2,
+  INTERVAL = 3,
+  NEED_OPEN_NOZZLE = 4,
+  AVAILABLE_TO_START = 5,
+  STARTED = 6,
+}
 
 // Main class for handling Liebinger printer operations
 export default class LiebingerClass {
@@ -50,7 +52,7 @@ export default class LiebingerClass {
   // Method to execute a command and validate the response
   public async executeCommand(command: string) {
     try {
-      console.log("call actual command", command);
+      // console.log("call actual command", command);
       const response = this.connection.write(command, (err) => {
         if (err) return;
         return true;
@@ -73,6 +75,20 @@ export default class LiebingerClass {
     this.connection.offData(listener);
   }
 
+  public onConnectionChange(
+    listener: (status: ConnectionStatus, error?: Error) => void | Promise<void>
+  ) {
+    return this.connection.onConnectionChange(listener);
+  }
+  public offConnectionChange(
+    listener: (status: ConnectionStatus, error?: Error) => void | Promise<void>
+  ) {
+    return this.connection.offConnectionChange(listener);
+  }
+
+  public getConnectionStatus() {
+    return this.connection.connectionStatus;
+  }
   // Method to check the printer status
   async checkPrinterStatus() {
     return this.executeCommand(`^0?RS\r\n`);
@@ -127,5 +143,10 @@ export default class LiebingerClass {
   async appendFifo(counter: number, uniquecode: string) {
     const command = `^0=MR${counter}\t${uniquecode}\r\n`;
     return this.executeCommand(command);
+  }
+
+  // Method to enable Echo Mode
+  async enableEchoMode() {
+    return this.executeCommand(`^0!EM\r\n`);
   }
 }

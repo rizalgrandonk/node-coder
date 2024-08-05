@@ -1,13 +1,7 @@
 import "dotenv/config";
 import "./db";
-// import "./connections/socket";
 import { spawn, Worker as ThreadWorker, Thread } from "threads";
-// import type { SocketWorker } from "./socketProcess";
-// import path from "path";
-// import * as SerialAction from "./actions/serial";
-// import type { DatabaseWorker } from "./databaseProcess";
 import { SharedPrimitive, SharedQueue } from "./utils/sharedBuffer";
-
 import { createServer } from "http";
 import { Server } from "socket.io";
 import express from "express";
@@ -26,17 +20,17 @@ const io = new Server(httpServer, {
   },
 });
 
-const serialConnection = new SerialConnection({
-  portOptions: {
-    path: process.env.SERIAL_NAME ?? "/dev/cu.usbmodem1401",
-    baudRate: +(process.env.SERIAL_BAUD_RATE ?? 115200),
-  },
-  parserOptions: {
-    delimiter: process.env.SERIAL_DELIMITER ?? "\r\n",
-  },
-});
+// const serialConnection = new SerialConnection({
+//   portOptions: {
+//     path: process.env.SERIAL_NAME ?? "/dev/cu.usbmodem1401",
+//     baudRate: +(process.env.SERIAL_BAUD_RATE ?? 115200),
+//   },
+//   parserOptions: {
+//     delimiter: process.env.SERIAL_DELIMITER ?? "\r\n",
+//   },
+// });
 
-serialConnection.connect();
+// serialConnection.connect();
 
 let updateInterval: NodeJS.Timeout | null = null;
 const MAX_QUEUE = Number(process.env.MAX_QUEUE ?? 254);
@@ -49,21 +43,26 @@ const printQueue = new SharedQueue(MAX_QUEUE);
 const printedQueue = new SharedQueue(MAX_QUEUE * 2);
 const DBUpdateQueue = new SharedQueue(MAX_QUEUE * 2);
 
-const startPrintProcess = async () => {
-  if (isPrinting.get()) {
-    console.log("Print process is already running");
-    return;
-  }
-  isPrinting.set(true);
+let databaseThread: Awaited<ReturnType<typeof spawn<DatabaseThread>>>;
+let printerThread: Awaited<ReturnType<typeof spawn<PrinterThread>>>;
 
-  console.log("START");
-  const timeBefore = performance.now();
-  let timeAfterPrinting: number;
+let batchInfo: {
+  batchNumber: string;
+  barcode: string;
+  estimate: number;
+} | null = null;
 
-  const databaseThread = await spawn<DatabaseThread>(
+const startBatch = async (info: {
+  batchNumber: string;
+  barcode: string;
+  estimate: number;
+}) => {
+  batchInfo = info;
+
+  databaseThread = await spawn<DatabaseThread>(
     new ThreadWorker("./threads/databaseThread")
   );
-  const printerThread = await spawn<PrinterThread>(
+  printerThread = await spawn<PrinterThread>(
     new ThreadWorker("./threads/printerThread")
   );
 
@@ -82,6 +81,22 @@ const startPrintProcess = async () => {
     printCounterBuffer: printerCounter.getBuffer(),
     displayMessageBuffer: displayMessage.getBuffer(),
   });
+};
+
+const startPrintProcess = async () => {
+  if (!batchInfo) {
+    console.log("Start Batch First");
+    return;
+  }
+  if (isPrinting.get()) {
+    console.log("Print process is already running");
+    return;
+  }
+  isPrinting.set(true);
+
+  console.log("START");
+  const timeBefore = performance.now();
+  let timeAfterPrinting: number;
 
   const uniquecodes = await databaseThread.populateBufer(MAX_QUEUE);
   if (!uniquecodes) {
@@ -102,10 +117,10 @@ const startPrintProcess = async () => {
     isPrinting.set(false);
   });
 
-  const serialPLCRun = runSerialPLC();
+  // const serialPLCRun = runSerialPLC();
 
   updateInterval = setInterval(async () => {
-    process.stdout.write("\x1Bc");
+    // process.stdout.write("\x1Bc");
     console.log({
       isPrintBuffer: isPrinting.get(),
       printBuffer: printQueue.size(),
@@ -119,26 +134,20 @@ const startPrintProcess = async () => {
       timeAfterPrinting = performance.now();
       await onCompleteHandler();
     }
-  }, 100);
+  }, 500);
 
   async function onCompleteHandler() {
     const timeAfter = performance.now();
     const timeDiff = timeAfter - timeBefore;
     const printDiff = timeAfterPrinting - timeBefore;
+
     console.log(`Printing process complete in ${printDiff} ms`);
-    console.log({ printedQueue: printedQueue.getAll() });
-
-    console.log(
-      `Finished processing ${printedQueue.size()} uniquecodes in ${timeDiff} ms`
-    );
-
+    console.log(`Finished processing in ${timeDiff} ms`);
     console.log(`Update delay for ${timeAfter - timeAfterPrinting}`);
 
     await printerThreadRun;
     await databaseThreadRun;
-    await serialPLCRun;
-    await Thread.terminate(databaseThread);
-    await Thread.terminate(printerThread);
+    // await serialPLCRun;
 
     if (updateInterval) clearInterval(updateInterval);
     io.emit("printComplete", {
@@ -147,28 +156,28 @@ const startPrintProcess = async () => {
     });
   }
 
-  async function runSerialPLC() {
-    while (isPrinting.get()) {
-      console.log("PLC LOOP");
+  // async function runSerialPLC() {
+  //   while (isPrinting.get()) {
+  //     console.log("PLC LOOP");
 
-      try {
-        const response = await serialConnection.writeAndResponse("0", {
-          responseValidation: (res) => typeof res === "string",
-          timeout: 2000,
-        });
-        if (!response) {
-          console.log("Failed request to serial connection");
-          return false;
-        }
-        const result = await insertSerialUniquecode(response, new Date());
-        console.log(`Complete processing serial update ${response}`, result);
+  //     try {
+  //       const response = await serialConnection.writeAndResponse("0", {
+  //         responseValidation: (res) => typeof res === "string",
+  //         timeout: 2000,
+  //       });
+  //       if (!response) {
+  //         console.log("Failed request to serial connection");
+  //         return false;
+  //       }
+  //       const result = await insertSerialUniquecode(response, new Date());
+  //       console.log(`Complete processing serial update ${response}`, result);
 
-        return true;
-      } catch (error: any) {
-        console.log(error?.message ?? "Error Serial Process");
-      }
-    }
-  }
+  //       return true;
+  //     } catch (error: any) {
+  //       console.log(error?.message ?? "Error Serial Process");
+  //     }
+  //   }
+  // }
 };
 
 io.on("connection", (socket) => {
@@ -192,12 +201,47 @@ io.on("connection", (socket) => {
 app.use(express.json());
 app.use(mainRoutes);
 
+app.post("/start-batch", (req, res) => {
+  const batchNumber = req.body.batchNumber;
+
+  const barcode = req.body.barcode;
+  const estimate = req.body.estimate;
+  if (
+    !batchNumber ||
+    !barcode ||
+    !estimate ||
+    typeof batchNumber !== "string" ||
+    typeof barcode !== "string" ||
+    typeof estimate !== "number"
+  ) {
+    return res.status(400).json({
+      message: "Failed",
+      error: "Invalid Param(s)",
+    });
+  }
+
+  const batchInfo = { batchNumber, barcode, estimate };
+  startBatch(batchInfo);
+  return res.status(200).json({ message: batchInfo });
+});
+
 app.get("/start-print", (req, res) => {
   startPrintProcess();
   return res.status(200).json({ message: "Success" });
 });
+
 app.get("/stop-print", (req, res) => {
   isPrinting.set(false);
+  return res.status(200).json({ message: "Success" });
+});
+
+app.get("/stop-batch", async (req, res) => {
+  if (databaseThread) {
+    await Thread.terminate(databaseThread);
+  }
+  if (printerThread) {
+    await Thread.terminate(printerThread);
+  }
   return res.status(200).json({ message: "Success" });
 });
 

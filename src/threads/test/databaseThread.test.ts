@@ -5,10 +5,19 @@ import {
   resetBulkBuffered,
 } from "../../services/uniquecodes";
 import { SharedPrimitive, SharedQueue } from "../../utils/sharedBuffer";
-import { sleep } from "../../utils/helper";
+
+const sleep = async (time: number) => {
+  return await new Promise((res) => setTimeout(res, time));
+};
 
 // Only mock the database services
 jest.mock("../../services/uniquecodes");
+jest.mock("../../utils/helper", () => ({
+  ...jest.requireActual("../../utils/helper"),
+  sleep: async () => {
+    return await new Promise((res) => setTimeout(res, 5));
+  },
+}));
 jest.mock("threads", () => ({
   expose: () => {},
 }));

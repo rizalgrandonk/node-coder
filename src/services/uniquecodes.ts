@@ -54,10 +54,10 @@ export const getUniquecodes: (
 export const resetBulkBuffered = async (uniquecodeIds: number[]) => {
   const query = `
     UPDATE uniquecode
-    SET printed=null, productid =null, 
-    batchid =null, buffered=null, 
-    sendconfirmed =null, coderstatus=null, 
-    printerlineid=null, markingprinterid =null
+    SET printed=null, productid=null, 
+    batchid=null, buffered=null, 
+    sendconfirmed=null, coderstatus=null, 
+    printerlineid=null, markingprinterid=null
     WHERE id=ANY($1::integer[])
   `;
 
