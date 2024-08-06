@@ -35,15 +35,19 @@ const mockedResetBulkBuffered = resetBulkBuffered as jest.MockedFunction<
 describe("DatabaseThread", () => {
   let databaseThread: DatabaseThread;
   let isPrinting: SharedPrimitive<boolean>;
+  let isPrinterFinished: SharedPrimitive<boolean>;
   let printQueue: SharedQueue;
   let printedQueue: SharedQueue;
   let DBUpdateQueue: SharedQueue;
+  let printerCounter: SharedPrimitive<number>;
 
   beforeEach(() => {
     jest.resetAllMocks();
 
     // Create actual SharedPrimitive and SharedQueue instances
     isPrinting = new SharedPrimitive<boolean>(false);
+    isPrinterFinished = new SharedPrimitive<boolean>(false);
+    printerCounter = new SharedPrimitive<number>(0);
     printQueue = new SharedQueue(400);
     printedQueue = new SharedQueue(400);
     DBUpdateQueue = new SharedQueue(400);
@@ -56,6 +60,8 @@ describe("DatabaseThread", () => {
     // Initialize the thread with real shared buffers
     databaseThread.init({
       isPrintBuffer: isPrinting.getBuffer(),
+      isPrinterFinishedBuffer: isPrinterFinished.getBuffer(),
+      printerCounterBuffer: printerCounter.getBuffer(),
       printBuffer: printQueue.getBuffer(),
       printedBuffer: printedQueue.getBuffer(),
       DBUpdateBuffer: DBUpdateQueue.getBuffer(),

@@ -39,6 +39,8 @@ const isPrinting = new SharedPrimitive<boolean>(false);
 const printerCounter = new SharedPrimitive<number>(0);
 const displayMessage = new SharedPrimitive<string>("");
 
+const isPrinterFinished = new SharedPrimitive<boolean>(false);
+
 const printQueue = new SharedQueue(MAX_QUEUE);
 const printedQueue = new SharedQueue(MAX_QUEUE * 2);
 const DBUpdateQueue = new SharedQueue(MAX_QUEUE * 2);
@@ -68,9 +70,11 @@ const startBatch = async (info: {
 
   await databaseThread.init({
     isPrintBuffer: isPrinting.getBuffer(),
+    printerCounterBuffer: printerCounter.getBuffer(),
     printBuffer: printQueue.getBuffer(),
     printedBuffer: printedQueue.getBuffer(),
     DBUpdateBuffer: DBUpdateQueue.getBuffer(),
+    isPrinterFinishedBuffer: isPrinterFinished.getBuffer(),
   });
 
   await printerThread.init({
@@ -80,6 +84,7 @@ const startBatch = async (info: {
     DBUpdateBuffer: DBUpdateQueue.getBuffer(),
     printCounterBuffer: printerCounter.getBuffer(),
     displayMessageBuffer: displayMessage.getBuffer(),
+    isPrinterFinishedBuffer: isPrinterFinished.getBuffer(),
   });
 };
 
@@ -93,6 +98,7 @@ const startPrintProcess = async () => {
     return;
   }
   isPrinting.set(true);
+  isPrinterFinished.set(false)
 
   console.log("START");
   const timeBefore = performance.now();
@@ -121,14 +127,25 @@ const startPrintProcess = async () => {
 
   updateInterval = setInterval(async () => {
     // process.stdout.write("\x1Bc");
-    console.log({
-      isPrintBuffer: isPrinting.get(),
-      printBuffer: printQueue.size(),
-      printedBuffer: printedQueue.size(),
-      DBUpdateBuffer: DBUpdateQueue.size(),
-      printCounterBuffer: printerCounter.get(),
-      displayMessageBuffer: displayMessage.get(),
-    });
+    // console.log({
+    //   isPrinting: isPrinting.get(),
+    //   printQueue: printQueue.size(),
+    //   printedQueue: printedQueue.size(),
+    //   DBUpdateQueue: DBUpdateQueue.size(),
+    //   printerCounter: printerCounter.get(),
+    //   displayMessage: displayMessage.get(),
+    // });
+
+    io.emit("printStatus", {
+      // isPrinting: isPrinting.get(),
+      printQueue: printQueue.size(),
+      printedQueue: printedQueue.size(),
+      // DBUpdateQueue: DBUpdateQueue.size(),
+      printerCounter: printerCounter.get(),
+      printedCount: printerCounter.get() - printedQueue.size(),
+      displayMessage: displayMessage.get(),
+    })
+
     if (!isPrinting.get()) {
       isPrinting.set(false);
       timeAfterPrinting = performance.now();

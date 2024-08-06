@@ -32,3 +32,20 @@ export const parseCheckMailingStatus = (response: string) => {
     lastStartedPrintNoWasFinished: parseInt(parts[4], 10),
   };
 };
+
+// Helper method to parse the current counter
+export const parseCurrentCouter = (response: string) => {
+  // Par1: Product Counter 
+  // Par2: Stop after X Products 
+  // Par3: Total print counter
+
+  // Parse the response
+  const parts = response.split(/\s+/);
+  return {
+    response,
+    productCounter: parseInt(parts[0].split("=CC")[1], 10),
+    stopoAfter: parseInt(parts[1], 10),
+    totalPrintCounter: parseInt(parts[2], 10),
+  };
+
+}

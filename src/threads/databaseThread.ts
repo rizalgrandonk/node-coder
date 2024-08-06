@@ -12,23 +12,31 @@ const MIN_QUEUE = Number(process.env.MIN_QUEUE ?? 180);
 // const GOALS_LENGTH = 10000;
 
 let isPrinting: SharedPrimitive<boolean>;
+let isPrinterFinished: SharedPrimitive<boolean>;
+let printerCounter: SharedPrimitive<number>;
 let printQueue: SharedQueue;
 let printedQueue: SharedQueue;
 let DBUpdateQueue: SharedQueue;
 
 type InitParams = {
   isPrintBuffer: SharedArrayBuffer;
+  isPrinterFinishedBuffer: SharedArrayBuffer;
+  printerCounterBuffer: SharedArrayBuffer;
   printBuffer: SharedArrayBuffer;
   printedBuffer: SharedArrayBuffer;
   DBUpdateBuffer: SharedArrayBuffer;
 };
 const init = ({
   isPrintBuffer,
+  isPrinterFinishedBuffer,
   printBuffer,
   printedBuffer,
   DBUpdateBuffer,
+  printerCounterBuffer
 }: InitParams) => {
   isPrinting = new SharedPrimitive<boolean>(isPrintBuffer);
+  isPrinterFinished = new SharedPrimitive<boolean>(isPrinterFinishedBuffer);
+  printerCounter = new SharedPrimitive<number>(printerCounterBuffer);
   printQueue = new SharedQueue(printBuffer);
   printedQueue = new SharedQueue(printedBuffer);
   DBUpdateQueue = new SharedQueue(DBUpdateBuffer);
@@ -36,7 +44,7 @@ const init = ({
 
 const run = async () => {
   while (
-    isPrinting.get() ||
+    !isPrinterFinished.get() ||
     DBUpdateQueue.size() > 0 ||
     printQueue.size() > 0 ||
     printedQueue.size() > 0
@@ -44,12 +52,16 @@ const run = async () => {
     if (DBUpdateQueue.size() > 0) {
       await updateBuffer(DBUpdateQueue.shiftAll());
     }
-    if (!isPrinting.get()) {
+    if (isPrinterFinished.get()) {
       if (printQueue.size() > 0 || printedQueue.size() > 0) {
+        // const printedSize = printedQueue.size()
+        
         await resetBuffer([
           ...printQueue.shiftAll(),
           ...printedQueue.shiftAll(),
         ]);
+        
+        // printerCounter.set(printerCounter.get() - printedSize)
       }
     }
 

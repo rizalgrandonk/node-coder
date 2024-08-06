@@ -132,13 +132,11 @@ export default class SocketConnection {
     return this.client.write(data, cb);
   }
 
-  public onData(listener: (data: string) => void) {
-    this.parser.on("data", (val: Buffer) => {
-      listener(val.toString());
-    });
+  public onData(listener: (data: any) => void) {
+    this.parser.on("data", listener);
   }
   public offData(listener: (data: any) => void) {
-    this.client.off("data", listener);
+    this.parser.off("data", listener);
   }
 
   public onConnectionChange(

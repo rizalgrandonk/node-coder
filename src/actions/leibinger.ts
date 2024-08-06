@@ -3,6 +3,7 @@ import SerialConnection, {
   SerialConnectionParameterType,
 } from "../connections/serial";
 import net from "net";
+import { sleep } from "../utils/helper";
 
 // Define the configuration type for different connection types
 type Config =
@@ -20,7 +21,7 @@ export type ConnectionStatus = "connect" | "error" | "close" | "end";
 export enum NOZZLE_STATE {
   INVALID = 0,
   OPENING = 1,
-  OPENED = 2,
+  READY = 2,
   CLOSING = 3,
   CLOSED = 4,
   INBETWEEN = 5,
@@ -32,7 +33,7 @@ export enum MACHINE_STATE {
   INTERVAL = 3,
   NEED_OPEN_NOZZLE = 4,
   AVAILABLE_TO_START = 5,
-  STARTED = 6,
+  READY = 6,
 }
 
 // Main class for handling Liebinger printer operations
@@ -68,10 +69,10 @@ export default class LiebingerClass {
     return this.connection.write(data, cb);
   }
 
-  public onData(listener: (data: string) => void | Promise<void>) {
+  public onData(listener: (data: Buffer) => void | Promise<void>) {
     this.connection.onData(listener);
   }
-  public offData(listener: (data: any) => void | Promise<void>) {
+  public offData(listener: (data: Buffer) => void | Promise<void>) {
     this.connection.offData(listener);
   }
 
@@ -91,11 +92,13 @@ export default class LiebingerClass {
   }
   // Method to check the printer status
   async checkPrinterStatus() {
+    // await sleep(1000)
     return this.executeCommand(`^0?RS\r\n`);
   }
 
   // Method to check mailing status
   async checkMailingStatus() {
+    // await sleep(1000)
     return this.executeCommand(`^0?SM\r\n`);
   }
 
@@ -117,6 +120,11 @@ export default class LiebingerClass {
   // Method to reset the counter
   async resetCounter() {
     return this.executeCommand(`^0=CC0\t0\t0\r\n`);
+  }
+
+  // Method to get the current counter
+  async currentCounter() {
+    return this.executeCommand(`^0?CC\r\n`);
   }
 
   // Method to flush the FIFO buffer

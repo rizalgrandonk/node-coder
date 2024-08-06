@@ -14,6 +14,7 @@ jest.mock("../../utils/helper");
 
 let printerThread: PrinterThread;
 let isPrinting: SharedPrimitive<boolean>;
+let isPrinterFinished: SharedPrimitive<boolean>;
 let printCounter: SharedPrimitive<number>;
 let printQueue: SharedQueue;
 let printedQueue: SharedQueue;
@@ -30,6 +31,7 @@ const setupPrinterThread = () => {
 
   // Create actual SharedPrimitive and SharedQueue instances
   isPrinting = new SharedPrimitive<boolean>(false);
+  isPrinterFinished = new SharedPrimitive<boolean>(false);
   printCounter = new SharedPrimitive<number>(0);
   printQueue = new SharedQueue(400);
   printedQueue = new SharedQueue(400);
@@ -44,6 +46,7 @@ const setupPrinterThread = () => {
   // Initialize the thread with real shared buffers
   printerThread.init({
     isPrintBuffer: isPrinting.getBuffer(),
+    isPrinterFinishedBuffer: isPrinterFinished.getBuffer(),
     printCounterBuffer: printCounter.getBuffer(),
     printBuffer: printQueue.getBuffer(),
     printedBuffer: printedQueue.getBuffer(),
@@ -62,7 +65,7 @@ describe("Printer Thread - Check Printer Status", () => {
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     printerThread.listenPrinterResponse();
     const onDataCallback = onData.mock.calls[0][0];
-    await onDataCallback("^0=RS1\t4\t0\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS1\t4\t0\t0\t80\t0\r"));
 
     expect(clientDisplayMessage.get()).toBe("OPENING NOZZLE");
     expect(sleep).toHaveBeenCalledWith(500); // Delay for machine nozzle open
@@ -76,7 +79,7 @@ describe("Printer Thread - Check Printer Status", () => {
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     printerThread.listenPrinterResponse();
     const onDataCallback = onData.mock.calls[0][0];
-    await onDataCallback("^0=RS1\t4\t0\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS1\t4\t0\t0\t80\t0\r"));
 
     expect(clientDisplayMessage.get()).toBe("OPENING NOZZLE");
     expect(LiebingerClass.prototype.checkPrinterStatus).toHaveBeenCalledTimes(
@@ -84,12 +87,12 @@ describe("Printer Thread - Check Printer Status", () => {
     );
   });
 
-  it("should call `startPrint` command when nozzle state is `OPENED` but machine state is not `STARTED`", async () => {
+  it("should call `startPrint` command when nozzle state is `READY` but machine state is not `READY`", async () => {
     isPrinting.set(true);
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     printerThread.listenPrinterResponse();
     const onDataCallback = onData.mock.calls[0][0];
-    await onDataCallback("^0=RS2\t4\t0\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t4\t0\t0\t80\t0\r"));
 
     expect(LiebingerClass.prototype.startPrint).toHaveBeenCalledTimes(1);
   });
@@ -99,7 +102,7 @@ describe("Printer Thread - Check Printer Status", () => {
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     printerThread.listenPrinterResponse();
     const onDataCallback = onData.mock.calls[0][0];
-    await onDataCallback("^0=RS2\t6\t1\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t6\t1\t0\t80\t0\r"));
 
     expect(clientDisplayMessage.get()).toBe("Unidentified Error Code: 1");
     expect(LiebingerClass.prototype.closeError).toHaveBeenCalledTimes(1);
@@ -121,7 +124,7 @@ describe("Printer Thread - Check Printer Status", () => {
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     printerThread.listenPrinterResponse();
     const onDataCallback = onData.mock.calls[0][0];
-    await onDataCallback("^0=RS2\t6\t1\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t6\t1\t0\t80\t0\r"));
 
     expect(clientDisplayMessage.get()).toBe("Unskipable Error");
     expect(LiebingerClass.prototype.closeError).toHaveBeenCalledTimes(1);
@@ -144,7 +147,7 @@ describe("Printer Thread - Check Printer Status", () => {
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     printerThread.listenPrinterResponse();
     const onDataCallback = onData.mock.calls[0][0];
-    await onDataCallback("^0=RS2\t6\t1476405210\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t6\t1476405210\t0\t80\t0\r"));
 
     expect(clientDisplayMessage.set).not.toHaveBeenCalledWith("Battery Low");
     expect(LiebingerClass.prototype.closeError).toHaveBeenCalledTimes(1);
@@ -177,8 +180,8 @@ describe("Printer Thread - On Start Batch", () => {
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     const onDataCallback = onData.mock.calls[0][0];
 
-    await onDataCallback("^0=RS2\t5\t0\t0\t80\t0\r");
-    await onDataCallback("^0=SM256\t0\t0\t0\t0\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t5\t0\t0\t80\t0\r"));
+    await onDataCallback(Buffer.from("^0=SM256\t0\t0\t0\t0\t0\r"));
 
     await printerThreadRun;
     expect(LiebingerClass.prototype.resetCounter).toHaveBeenCalledTimes(1);
@@ -200,7 +203,7 @@ describe("Printer Thread - On Start Print", () => {
     const onDataCallback = onData.mock.calls[0][0];
 
     /** ON FIRST RUN PRINT */
-    await onDataCallback("^0=RS2\t6\t0\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t6\t0\t0\t80\t0\r"));
     expect(LiebingerClass.prototype.flushFIFO).toHaveBeenCalledTimes(1);
     expect(LiebingerClass.prototype.hideDisplay).toHaveBeenCalledTimes(1);
     expect(LiebingerClass.prototype.enableEchoMode).toHaveBeenCalledTimes(1);
@@ -209,7 +212,7 @@ describe("Printer Thread - On Start Print", () => {
     );
 
     /** ON NEXT RUN UNTIL PRINT STOP */
-    await onDataCallback("^0=RS2\t6\t0\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t6\t0\t0\t80\t0\r"));
     expect(LiebingerClass.prototype.checkMailingStatus).toHaveBeenCalledTimes(
       1
     );
@@ -225,10 +228,10 @@ describe("Printer Thread - On Start Print", () => {
     const onDataCallback = onData.mock.calls[0][0];
 
     /** ON FIRST RUN PRINT */
-    await onDataCallback("^0=RS2\t6\t0\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t6\t0\t0\t80\t0\r"));
 
     /** ON NEXT RUN UNTIL PRINT STOP */
-    await onDataCallback("^0=RS2\t6\t0\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t6\t0\t0\t80\t0\r"));
     expect(LiebingerClass.prototype.checkMailingStatus).toHaveBeenCalledTimes(
       1
     );
@@ -243,14 +246,14 @@ describe("Printer Thread - On Stop Print", () => {
     setupPrinterThread();
   });
 
-  it("should call `stopPrint` command when machine state still `STARTED`", async () => {
+  it("should call `stopPrint` command when machine state still `READY`", async () => {
     isPrinting.set(false);
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     printerThread.listenPrinterResponse();
 
     const onDataCallback = onData.mock.calls[0][0];
 
-    await onDataCallback("^0=RS2\t6\t0\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS2\t6\t0\t0\t80\t0\r"));
 
     expect(clientDisplayMessage.get()).toBe("STOP PRINTING");
     expect(LiebingerClass.prototype.stopPrint).toHaveBeenCalledTimes(1);
@@ -264,7 +267,7 @@ describe("Printer Thread - On Stop Print", () => {
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     printerThread.listenPrinterResponse();
     const onDataCallback = onData.mock.calls[0][0];
-    await onDataCallback("^0=RS4\t4\t0\t0\t80\t0\r");
+    await onDataCallback(Buffer.from("^0=RS4\t4\t0\t0\t80\t0\r"));
 
     expect(clientDisplayMessage.get()).toBe("STOP PRINTING");
     expect(LiebingerClass.prototype.showDisplay).toHaveBeenCalledTimes(1);
