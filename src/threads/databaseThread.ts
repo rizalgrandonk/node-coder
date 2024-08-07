@@ -32,7 +32,7 @@ const init = ({
   printBuffer,
   printedBuffer,
   DBUpdateBuffer,
-  printerCounterBuffer
+  printerCounterBuffer,
 }: InitParams) => {
   isPrinting = new SharedPrimitive<boolean>(isPrintBuffer);
   isPrinterFinished = new SharedPrimitive<boolean>(isPrinterFinishedBuffer);
@@ -54,14 +54,17 @@ const run = async () => {
     }
     if (isPrinterFinished.get()) {
       if (printQueue.size() > 0 || printedQueue.size() > 0) {
-        const printedSize = printedQueue.size()
-        
+        const printedSize = printedQueue.size();
+
         await resetBuffer([
           ...printQueue.shiftAll(),
           ...printedQueue.shiftAll(),
         ]);
-        
-        printerCounter.set(printerCounter.get() - printedSize)
+        // ! TEMPORARY FOR TEST
+        // printQueue.shiftAll();
+        // printedQueue.shiftAll();
+
+        printerCounter.set(printerCounter.get() - printedSize);
       }
     }
 
