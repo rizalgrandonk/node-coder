@@ -54,14 +54,14 @@ const run = async () => {
     }
     if (isPrinterFinished.get()) {
       if (printQueue.size() > 0 || printedQueue.size() > 0) {
-        // const printedSize = printedQueue.size()
+        const printedSize = printedQueue.size()
         
         await resetBuffer([
           ...printQueue.shiftAll(),
           ...printedQueue.shiftAll(),
         ]);
         
-        // printerCounter.set(printerCounter.get() - printedSize)
+        printerCounter.set(printerCounter.get() - printedSize)
       }
     }
 

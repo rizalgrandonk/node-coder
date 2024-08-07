@@ -49,6 +49,7 @@ const printer = new LiebingerClass(
 
 let printCounter: SharedPrimitive<number>;
 let isPrinting: SharedPrimitive<boolean>;
+let isPrinterFinished: SharedPrimitive<boolean>;
 let clientDisplayMessage: SharedPrimitive<string>;
 let printQueue: SharedQueue;
 let printedQueue: SharedQueue;
@@ -56,7 +57,8 @@ let DBUpdateQueue: SharedQueue;
 let isFirstRun: boolean = true;
 let isFirstRefill: boolean = true;
 let lastUpdate: boolean = false;
-let isPrinterFinished: SharedPrimitive<boolean>;
+let lastMailingStatusKey: string;
+let sameMailingStatusCounter: number;
 
 type InitParams = {
   isPrintBuffer: SharedArrayBuffer;
@@ -199,20 +201,23 @@ const listenPrinterResponse = async () => {
       // Handle as printer status
       if (printerResponse.startsWith("^0=RS")) {
         await handlePrinterStatus(printerResponse);
+        if (!isPrinting.get() && isPrinterFinished.get()) {
+          printer.offData(listenerHandler);
+          printer.offConnectionChange(connectionChangeHandler);
+          resolve();
+        }  
       }
 
       // Handle as mailing status
       if (printerResponse.startsWith("^0=SM")) {
         await handleMailingStatus(printerResponse);
-
-        if (lastUpdate) {
-          printer.offData(listenerHandler);
-          printer.offConnectionChange(connectionChangeHandler);
-          resolve();
-        }
       }
+
+
     };
 
+    
+    
     printer.onData(listenerHandler);
 
     printer.onConnectionChange(connectionChangeHandler);
@@ -225,7 +230,9 @@ const run = async () => {
   // set first refill to true
   isFirstRefill = true;
   lastUpdate = false;
-
+  sameMailingStatusCounter = 0;
+  lastMailingStatusKey = ""
+  
   const listener = listenPrinterResponse();
 
   if (printer.getConnectionStatus() !== "connect") {
@@ -268,10 +275,11 @@ const handlePrinterStatus = async (printerResponse: string) => {
   const { machineState, errorState, nozzleState } =
     parseCheckPrinterStatus(printerResponse);
 
-  // console.log({ machineState, errorState, nozzleState, isFirstRun, receiveTime: Date.now() });
+  console.log({ machineState, errorState, nozzleState, isFirstRun, isPrinterFinished: isPrinterFinished.get(), isPrinting: isPrinting.get() });
 
   // If there is no print action initiated from client
-  if (!isPrinting.get()) {
+  if (!isPrinting.get() && lastUpdate) {
+    console.log("STOP PRINTING")
     clientDisplayMessage.set("STOP PRINTING");
 
     // Stop Printer Status
@@ -291,11 +299,13 @@ const handlePrinterStatus = async (printerResponse: string) => {
       await printer.showDisplay();
 
       // Mask the current printer display
-      const currentPrintCounter = incrementPrintCounter();
-      await printer.appendFifo(currentPrintCounter, "XXXXXXXXXX");
+      // const currentPrintCounter = incrementPrintCounter();
+      await printer.appendFifo(0, "XXXXXXXXXX");
 
-      lastUpdate = true;
+      
+      isPrinterFinished.set(true);
 
+      
       /** --- PRINTING ENDED --- */
       await printer.checkMailingStatus()
     }
@@ -404,7 +414,6 @@ const handleMailingStatus = async (printerResponse: string) => {
     DBUpdateQueue: DBUpdateQueue.size(),
     printerCounter: printCounter.get(),
     displayMessage: clientDisplayMessage.get(),
-    getCounter: (await getCounter())
   });
 
   // Move Queue From Printed Queue To DB Update Queue
@@ -419,12 +428,28 @@ const handleMailingStatus = async (printerResponse: string) => {
     }
   }
 
-  if (lastUpdate) {
-    console.log("MAILING STATUS LAST UPDATE")
-    isPrinterFinished.set(true);
+  if (!isPrinting.get()) {
+    const currentMailingStatusKey = `${fifoEntries}_${lastStartedPrintNo}`;
+    console.log({lastMailingStatusKey , currentMailingStatusKey, sameMailingStatusCounter})
+    if (lastMailingStatusKey === currentMailingStatusKey) {
+      sameMailingStatusCounter++
+    }
+    
+
+    if (sameMailingStatusCounter >= 3) {
+      lastUpdate = true;
+    }
+
+    lastMailingStatusKey = currentMailingStatusKey;
 
     return;
   }
+  // if (lastUpdate) {
+  //   console.log("MAILING STATUS LAST UPDATE")
+  //   isPrinterFinished.set(true);
+
+  //   return;
+  // }
 
   // Create Unique Code Command
   const sendUniqueCodeCommand: string[] = [];
