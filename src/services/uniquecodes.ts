@@ -48,7 +48,10 @@ export const getUniquecodes: (
     return undefined;
   }
 
-  return result.rows;
+  // return result.rows;
+
+  // return sorted data by id asc
+  return result.rows.sort((a, b) => a.id - b.id);
 };
 
 export const resetBulkBuffered = async (uniquecodeIds: number[]) => {
@@ -70,7 +73,7 @@ export const setBulkPrintedStatus = async (
   uniquecodeIds: number[],
   timestamp: Date
 ) => {
-  const coderstatus = "PRINTED";
+  const coderstatus = "COK";
   const query = `
     UPDATE uniquecode
     SET coderstatus=$1, printed=$2

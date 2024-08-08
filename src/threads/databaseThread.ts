@@ -7,13 +7,14 @@ import {
 import { chunkArray, sleep } from "../utils/helper";
 import { QueueItem, SharedPrimitive, SharedQueue } from "../utils/sharedBuffer";
 
-const MAX_QUEUE = Number(process.env.MAX_QUEUE ?? 254);
-const MIN_QUEUE = Number(process.env.MIN_QUEUE ?? 180);
+const MAX_PRINT_QUEUE = Number(process.env.MAX_PRINT_QUEUE ?? 254);
+const MIN_PRINT_QUEUE = Number(process.env.MIN_PRINT_QUEUE ?? 180);
 // const GOALS_LENGTH = 10000;
 
 let isPrinting: SharedPrimitive<boolean>;
 let isPrinterFinished: SharedPrimitive<boolean>;
 let printerCounter: SharedPrimitive<number>;
+let displayMessage: SharedPrimitive<string>;
 let printQueue: SharedQueue;
 let printedQueue: SharedQueue;
 let DBUpdateQueue: SharedQueue;
@@ -25,6 +26,7 @@ type InitParams = {
   printBuffer: SharedArrayBuffer;
   printedBuffer: SharedArrayBuffer;
   DBUpdateBuffer: SharedArrayBuffer;
+  displayMessageBuffer: SharedArrayBuffer;
 };
 const init = ({
   isPrintBuffer,
@@ -33,10 +35,12 @@ const init = ({
   printedBuffer,
   DBUpdateBuffer,
   printerCounterBuffer,
+  displayMessageBuffer,
 }: InitParams) => {
   isPrinting = new SharedPrimitive<boolean>(isPrintBuffer);
   isPrinterFinished = new SharedPrimitive<boolean>(isPrinterFinishedBuffer);
   printerCounter = new SharedPrimitive<number>(printerCounterBuffer);
+  displayMessage = new SharedPrimitive<string>(displayMessageBuffer);
   printQueue = new SharedQueue(printBuffer);
   printedQueue = new SharedQueue(printedBuffer);
   DBUpdateQueue = new SharedQueue(DBUpdateBuffer);
@@ -68,9 +72,13 @@ const run = async () => {
       }
     }
 
-    const emptySlot = MAX_QUEUE - printQueue.size();
+    const emptySlot = MAX_PRINT_QUEUE - printQueue.size();
 
-    if (isPrinting.get() && emptySlot > 0 && printQueue.size() <= MIN_QUEUE) {
+    if (
+      isPrinting.get() &&
+      emptySlot > 0 &&
+      printQueue.size() <= MIN_PRINT_QUEUE
+    ) {
       const newUniquecodes = await populateBufer(emptySlot);
       if (newUniquecodes) {
         printQueue.push(...newUniquecodes);
@@ -84,14 +92,15 @@ const run = async () => {
 };
 
 async function updateBuffer(DBUpdateQueue: QueueItem[]) {
-  const chunks = chunkArray(DBUpdateQueue, 500);
-  await Promise.all(
-    chunks.map((codes) =>
-      setBulkPrintedStatus(
-        codes.map((code) => code.id),
-        new Date()
-      )
-    )
+  const uniquecodeIds = DBUpdateQueue.map((code) => code.id);
+
+  if (uniquecodeIds.length >= 500) {
+    return await setBulkPrintedStatus(uniquecodeIds, new Date());
+  }
+
+  const chunks = chunkArray(uniquecodeIds, 500);
+  return await Promise.all(
+    chunks.map((codes) => setBulkPrintedStatus(codes, new Date()))
   );
 }
 

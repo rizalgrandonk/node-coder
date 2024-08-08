@@ -18,6 +18,26 @@ describe("Shared Queue", () => {
     queue.push(...rawData);
     expect(queue.getAll()).toEqual(rawData);
   });
+  it("can add multiple items to the queue (500)", () => {
+    const rawData = Array.from(new Array(500), (_, index) => ({
+      id: 1000000 + index + 1,
+      uniquecode: `TESTCODE${index + 1}`,
+    }));
+    const queue = new SharedQueue(2000);
+    queue.push(...rawData);
+    expect(queue.getAll()).toEqual(rawData);
+    expect(queue.shiftAll()).toEqual(rawData);
+  });
+  it("can add multiple items to the queue (1000)", () => {
+    const rawData = Array.from(new Array(1000), (_, index) => ({
+      id: 1000000 + index + 1,
+      uniquecode: `TESTCODE${index + 1}`,
+    }));
+    const queue = new SharedQueue(2000);
+    queue.push(...rawData);
+    expect(queue.getAll()).toEqual(rawData);
+    expect(queue.shiftAll()).toEqual(rawData);
+  });
   it("can read all items in the queue", () => {
     const rawData = [
       { id: 1000001, uniquecode: "00001" },

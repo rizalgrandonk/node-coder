@@ -54,6 +54,8 @@ let batchInfo: {
   estimate: number;
 } | null = null;
 
+// let printProcess: Promise<void>;
+
 const startBatch = async (info: {
   batchNumber: string;
   barcode: string;
@@ -75,6 +77,7 @@ const startBatch = async (info: {
     printedBuffer: printedQueue.getBuffer(),
     DBUpdateBuffer: DBUpdateQueue.getBuffer(),
     isPrinterFinishedBuffer: isPrinterFinished.getBuffer(),
+    displayMessageBuffer: displayMessage.getBuffer(),
   });
 
   await printerThread.init({
@@ -171,6 +174,8 @@ const startPrintProcess = async () => {
       printedCount: printedQueue.size(),
       timeDiff,
     });
+
+    // resolve();
   }
 
   // async function runSerialPLC() {
@@ -247,12 +252,19 @@ app.get("/start-print", (req, res) => {
   return res.status(200).json({ message: "Success" });
 });
 
-app.get("/stop-print", (req, res) => {
+app.get("/stop-print", async (req, res) => {
+  // TODO : Prevent Stop Print if connection lost
   isPrinting.set(false);
+
+  // await printProcess
   return res.status(200).json({ message: "Success" });
 });
 
 app.get("/stop-batch", async (req, res) => {
+  isPrinting.set(false);
+
+  // await printProcess
+
   if (databaseThread) {
     await Thread.terminate(databaseThread);
   }

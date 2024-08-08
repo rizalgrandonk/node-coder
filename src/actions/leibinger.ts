@@ -70,9 +70,11 @@ export default class LiebingerClass {
   }
 
   public onData(listener: (data: Buffer) => void | Promise<void>) {
+    console.log("Listener attached", listener.name);
     this.connection.onData(listener);
   }
   public offData(listener: (data: Buffer) => void | Promise<void>) {
+    console.log("Listener detached", listener.name);
     this.connection.offData(listener);
   }
 
@@ -92,13 +94,14 @@ export default class LiebingerClass {
   }
   // Method to check the printer status
   async checkPrinterStatus() {
-    // await sleep(1000)
+    // console.log("CHECK PRINTER STATUS METHOD", new Date().toString());
+    // await sleep(1000);
     return this.executeCommand(`^0?RS\r\n`);
   }
 
   // Method to check mailing status
   async checkMailingStatus() {
-    // await sleep(1000)
+    // await sleep(1000);
     return this.executeCommand(`^0?SM\r\n`);
   }
 

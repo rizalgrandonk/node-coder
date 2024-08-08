@@ -40,6 +40,7 @@ describe("DatabaseThread", () => {
   let printedQueue: SharedQueue;
   let DBUpdateQueue: SharedQueue;
   let printerCounter: SharedPrimitive<number>;
+  let displayMessage: SharedPrimitive<string>;
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -48,6 +49,7 @@ describe("DatabaseThread", () => {
     isPrinting = new SharedPrimitive<boolean>(false);
     isPrinterFinished = new SharedPrimitive<boolean>(false);
     printerCounter = new SharedPrimitive<number>(0);
+    displayMessage = new SharedPrimitive<string>("");
     printQueue = new SharedQueue(400);
     printedQueue = new SharedQueue(400);
     DBUpdateQueue = new SharedQueue(400);
@@ -65,6 +67,7 @@ describe("DatabaseThread", () => {
       printBuffer: printQueue.getBuffer(),
       printedBuffer: printedQueue.getBuffer(),
       DBUpdateBuffer: DBUpdateQueue.getBuffer(),
+      displayMessageBuffer: displayMessage.getBuffer(),
     });
   });
 

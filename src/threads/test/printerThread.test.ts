@@ -166,9 +166,42 @@ describe("Printer Thread - Check Printer Status", () => {
 
     expect(clientDisplayMessage.get()).toBe("PRINTER CONNECTION CLOSED");
   });
+
+  it("should clear `clientDisplayMessage` when printer connected", async () => {
+    isPrinting.set(true);
+    const onData = jest.spyOn(LiebingerClass.prototype, "onConnectionChange");
+
+    printerThread.listenPrinterResponse();
+    const onDataCallback = onData.mock.calls[0][0];
+    await onDataCallback("connect");
+
+    expect(clientDisplayMessage.get()).toBe("");
+  });
+
+  it("should update `clientDisplayMessage` when printerQueue is under minimum queue", async () => {
+    isPrinting.set(true);
+    printQueue.shiftAll();
+    const onData = jest.spyOn(LiebingerClass.prototype, "onData");
+    printerThread.listenPrinterResponse();
+    const onDataCallback = onData.mock.calls[0][0];
+
+    /** ON FIRST RUN PRINT */
+    await onDataCallback(Buffer.from("^0=RS2\t6\t0\t0\t80\t0\r"));
+
+    /** ON NEXT RUN UNTIL PRINT STOP */
+    await onDataCallback(Buffer.from("^0=RS2\t6\t0\t0\t80\t0\r"));
+
+    expect(clientDisplayMessage.get()).toBe("PRINT BUFFER UNDER LIMIT");
+    expect(LiebingerClass.prototype.checkPrinterStatus).toHaveBeenCalledTimes(
+      2
+    );
+    expect(LiebingerClass.prototype.checkMailingStatus).toHaveBeenCalledTimes(
+      1
+    );
+  });
 });
 
-describe.only("Printer Thread - On Print Process", () => {
+describe("Printer Thread - On Print Process", () => {
   beforeEach(() => {
     setupPrinterThread();
   });

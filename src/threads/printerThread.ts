@@ -16,6 +16,13 @@ import {
 } from "../utils/leibinger";
 import { isMainThread } from "worker_threads";
 
+const MIN_PRINT_QUEUE = Number(process.env.MIN_PRINT_QUEUE ?? 180);
+const CONNECTION_ERROR_LIST = {
+  CLOSED: "PRINTER CONNECTION CLOSED",
+  ERROR: "PRINTER CONNECTION ERROR",
+  ENDED: "PRINTER CONNECTION ENDED",
+};
+
 // console.log("Printer Thread Spawned");
 
 // ? Configuration for printer connection
@@ -160,24 +167,35 @@ const listenPrinterResponse = async () => {
     ) => {
       if (status === "close") {
         console.log("Printer Connection Closed");
-        clientDisplayMessage.set("PRINTER CONNECTION CLOSED");
+        clientDisplayMessage.set(CONNECTION_ERROR_LIST.CLOSED);
       } else if (status === "error") {
-        console.log("Printer Connection Error");
-        clientDisplayMessage.set(`PRINTER CONNECTION ERROR : ${err}`);
+        console.log("Printer Connection Error", err);
+        clientDisplayMessage.set(CONNECTION_ERROR_LIST.ERROR);
       } else if (status === "end") {
         console.log("Printer Connection Ended");
-        clientDisplayMessage.set("PRINTER CONNECTION ENDED");
+        clientDisplayMessage.set(CONNECTION_ERROR_LIST.ENDED);
       } else if (status === "connect") {
-        await printer.checkPrinterStatus();
+        console.log("Printer Connection Established");
+        if (
+          Object.values(CONNECTION_ERROR_LIST).includes(
+            clientDisplayMessage.get()
+          )
+        ) {
+          clientDisplayMessage.set("");
+          await printer.checkPrinterStatus();
+        }
       }
     };
 
     const listenerHandler = async (printerResponseBuffer: Buffer) => {
-      // await sleep(500)
+      // await sleep(1000);
       const printerResponse = printerResponseBuffer.toString();
 
       if (printer.getConnectionStatus() !== "connect") {
+        console.log("LISTENER HANDLER - Connection Lost, wait till connect");
         await waitConnectionReady();
+        await printer.checkPrinterStatus();
+        return;
       }
 
       if (!printerResponse.startsWith("^0")) {
@@ -283,33 +301,55 @@ const getRefillCount = (values: {
     ? fifoEntries - 1
     : fifoEntries;
 
-  const emptySlot =
-    maxPrintedQueueSize - (actualFifoEntries + (isFirstRefill ? 0 : 1));
+  const fifoEntriesPrinter = actualFifoEntries + (isFirstRefill ? 0 : 1);
 
-  console.log("GET REFILL COUNT", {
-    toUpdateCount,
-    emptySlot,
-  });
+  const emptySlot = maxPrintedQueueSize - fifoEntriesPrinter;
+
+  if (prevLastStartPrinNo > 0 && toUpdateCount > 0 && !isFirstRefill) {
+    console.log("toUpdateCount", toUpdateCount);
+    return toUpdateCount;
+  }
+
+  if (isFirstRefill) {
+    isFirstRefill = false;
+    return emptySlot;
+  }
+
+  return fifoEntriesPrinter === printedQueue.size() ? 0 : emptySlot;
+
+  // console.log("GET REFILL COUNT", {
+  //   toUpdateCount,
+  //   emptySlot,
+  // });
 
   /**
    * Refill count based on lastStartedPrinNo when not first refill
    * Program will use this formula if previous lastStartedPrinNo > 0
    * and its not the first refill
    */
-  if (prevLastStartPrinNo > 0 && toUpdateCount > 0 && !isFirstRefill) {
-    return toUpdateCount;
-  }
+  // if (prevLastStartPrinNo > 0 && toUpdateCount > 0 && !isFirstRefill) {
+  //   console.log("toUpdateCount", toUpdateCount);
+  //   return toUpdateCount;
+  // }
 
+  // if (actualFifoEntries > 0 && printQueue.size() === 0 && !isFirstRefill) {
+  //   console.log(
+  //     "actualFifoEntries > 0 && printQueue.size() === 0 && !isFirstRefill",
+  //     toUpdateCount
+  //   );
+  //   return 0;
+  // }
   /**
    * Refill count based on maxPrintedQueueSize and fifoEntries
    * It will prevent mismatch updated value when user manual adjust counter on device without print any code
    */
-  if ((actualFifoEntries > 0 || isFirstRefill) && emptySlot > 0) {
-    return emptySlot;
-  }
+  // if ((actualFifoEntries > 0 || isFirstRefill) && emptySlot > 0) {
+  //   console.log("emptySlot", emptySlot);
+  //   return emptySlot;
+  // }
 
   // Fallback value
-  return 0;
+  // return 0;
 };
 
 const setLastUpdate = (status: boolean) => {
@@ -338,12 +378,7 @@ const handlePrinterStatus = async (printerResponse: string) => {
 
     // Stop Printer Status
     if (machineState === MACHINE_STATE.READY) {
-      // if (!lastUpdate) {
-      //   lastUpdate = true;
-      //   // Check mailing status last time to make sure printer stop printing
-      //   await printer.checkMailingStatus();
-      // }
-
+      console.log("disini stop print printer status");
       await printer.stopPrint();
       await printer.checkPrinterStatus();
     }
@@ -355,7 +390,7 @@ const handlePrinterStatus = async (printerResponse: string) => {
       // Mask the current printer display
       // const currentPrintCounter = incrementPrintCounter();
       await printer.appendFifo(0, "XXXXXXXXXX");
-
+      console.log("AFTER SEND XXXX");
       isPrinterFinished.set(true);
 
       /** --- PRINTING ENDED --- */
@@ -365,6 +400,7 @@ const handlePrinterStatus = async (printerResponse: string) => {
 
   // Check if printer in error condition
   else if (errorState != 0) {
+    console.log("aku ada error", errorState, printerResponse);
     const identifiedErrors = await ErrorCodeService.findByCode(
       errorState.toString()
     );
@@ -382,11 +418,13 @@ const handlePrinterStatus = async (printerResponse: string) => {
       clientDisplayMessage.set(identifiedErrors[0]?.errorname);
     }
 
+    console.log("aku close error", errorState);
+    isFirstRefill = true;
     await printer.closeError();
     await printer.checkPrinterStatus();
   }
 
-  // Open Nozzle if nozzle is closed and update Client Display Message
+  // Open Nozzle if nozzle is CLOSED and update Client Display Message
   else if (
     nozzleState === NOZZLE_STATE.CLOSED ||
     nozzleState === NOZZLE_STATE.CLOSING ||
@@ -397,30 +435,30 @@ const handlePrinterStatus = async (printerResponse: string) => {
     await printer.checkPrinterStatus();
   }
 
-  // Update Client Display Message if nozzle is in opening state
+  // Update Client Display Message if nozzle is in OPENING state
   else if (nozzleState === NOZZLE_STATE.OPENING) {
     clientDisplayMessage.set("OPENING NOZZLE");
     await sleep(500);
     await printer.checkPrinterStatus();
   }
 
-  // Start Print if nozzle is opened but printer is not started
+  // Start Print if nozzle is READY but printer is not READY
   else if (
     nozzleState === NOZZLE_STATE.READY &&
     machineState != MACHINE_STATE.READY
   ) {
-    clientDisplayMessage.set("");
-
+    console.log("aku start print", printerResponse);
     await printer.startPrint();
     await printer.checkPrinterStatus();
   }
 
-  // Flush FIFO and Hide Display if machine is started and on first run
+  // Flush fifo and Hide Display if machine is started and on first run
   else if (
     nozzleState === NOZZLE_STATE.READY &&
     machineState === MACHINE_STATE.READY &&
     isFirstRun
   ) {
+    console.log("BEFORE RESET");
     await printer.flushFIFO();
     await printer.hideDisplay();
     await printer.enableEchoMode();
@@ -437,6 +475,17 @@ const handlePrinterStatus = async (printerResponse: string) => {
     machineState === MACHINE_STATE.READY &&
     !isFirstRun
   ) {
+    // Reset Display Error Message
+    if (
+      !Object.values(CONNECTION_ERROR_LIST).includes(clientDisplayMessage.get())
+    ) {
+      if (printQueue.size() < MIN_PRINT_QUEUE) {
+        clientDisplayMessage.set("PRINT BUFFER UNDER LIMIT");
+      } else {
+        clientDisplayMessage.set("");
+      }
+    }
+
     await printer.checkMailingStatus();
     await printer.checkPrinterStatus();
   }
@@ -451,6 +500,7 @@ const handleMailingStatus = async (printerResponse: string) => {
   } = parseCheckMailingStatus(printerResponse);
 
   const maxPrintedQueueSize = Number(process.env.MAX_PRINTED_QUEUE ?? 60);
+
   const refillCount = getRefillCount({
     fifoEntries,
     maxPrintedQueueSize,
@@ -477,28 +527,10 @@ const handleMailingStatus = async (printerResponse: string) => {
     toUpdateCount: lastStartedPrintNo - prevLastStartPrinNo,
   });
 
-  if (
-    maxPrintedQueueSize -
-      (fifoEntries + (isFirstRefill ? 0 : 1)) -
-      (lastUpdate ? 1 : 0) !==
-    lastStartedPrintNo - prevLastStartPrinNo
-  ) {
-    console.log(
-      "####################################",
-      {
-        prevLastStartPrinNo,
-        lastStartedPrintNo,
-        toUpdateCount: lastStartedPrintNo - prevLastStartPrinNo,
-        refillCount:
-          maxPrintedQueueSize -
-          (fifoEntries + (isFirstRefill ? 0 : 1)) -
-          (lastUpdate ? 1 : 0),
-      },
-      "####################################"
-    );
-  }
-
+  // Set Last Start Print No
+  // if (!isFirstRefill) {
   prevLastStartPrinNo = lastStartedPrintNo;
+  // }
 
   // Move Queue From Printed Queue To DB Update Queue
   if (currentPrintedQueueSize > 0 && refillCount > 0) {
@@ -512,20 +544,24 @@ const handleMailingStatus = async (printerResponse: string) => {
     }
   }
 
+  /**
+   * Handle User Stop Print Request
+   * Wait for 3 consecutive mailing status to be same to make sure
+   * there is no print in progress then stop print
+   * (to stop print when no print action by user)
+   * Or if fifo entries is one or less then stop print
+   * (to prevent error Empty Mailing Buffer)
+   *
+   * */
   if (!isPrinting.get()) {
     const currentMailingStatusKey = `${fifoEntries}_${lastStartedPrintNo}`;
-    // console.log({
-    //   lastMailingStatusKey,
-    //   currentMailingStatusKey,
-    //   sameMailingStatusCounter,
-    // });
     if (lastMailingStatusKey === currentMailingStatusKey) {
       sameMailingStatusCounter++;
     }
 
-    if (sameMailingStatusCounter >= 3 || fifoEntries <= 1) {
+    if ((sameMailingStatusCounter >= 3 || fifoEntries <= 1) && !lastUpdate) {
       setLastUpdate(true);
-      // lastUpdate = true;
+      console.log("disini stop print mailing status");
       await printer.stopPrint();
       await printer.checkMailingStatus();
     }
@@ -534,13 +570,6 @@ const handleMailingStatus = async (printerResponse: string) => {
 
     return;
   }
-
-  // if (lastUpdate) {
-  //   console.log("MAILING STATUS LAST UPDATE")
-  //   isPrinterFinished.set(true);
-
-  //   return;
-  // }
 
   // Create Unique Code Command
   const sendUniqueCodeCommand: string[] = [];
