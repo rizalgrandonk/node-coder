@@ -98,7 +98,7 @@ const startPrintProcess = async () => {
     return;
   }
   isPrinting.set(true);
-  isPrinterFinished.set(false)
+  isPrinterFinished.set(false);
 
   console.log("START");
   const timeBefore = performance.now();
@@ -144,7 +144,7 @@ const startPrintProcess = async () => {
       printerCounter: printerCounter.get(),
       printedCount: printerCounter.get() - printedQueue.size(),
       displayMessage: displayMessage.get(),
-    })
+    });
 
     if (!isPrinting.get()) {
       isPrinting.set(false);
@@ -259,6 +259,9 @@ app.get("/stop-batch", async (req, res) => {
   if (printerThread) {
     await Thread.terminate(printerThread);
   }
+
+  batchInfo = null;
+
   return res.status(200).json({ message: "Success" });
 });
 

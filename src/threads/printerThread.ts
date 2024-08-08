@@ -1,9 +1,7 @@
 import "dotenv/config";
 import { expose } from "threads";
-import { Observable, Subject } from "threads/observable";
 import { sleep } from "../utils/helper";
 import { SharedPrimitive, SharedQueue } from "../utils/sharedBuffer";
-import SocketConnection from "../connections/socket";
 import LiebingerClass, {
   MACHINE_STATE,
   NOZZLE_STATE,
@@ -20,10 +18,12 @@ import { isMainThread } from "worker_threads";
 
 // console.log("Printer Thread Spawned");
 
+// ? Configuration for printer connection
 const PRINTER_CONNECTION = process.env.PRINTER_CONNECTION
   ? (process.env.PRINTER_CONNECTION as "socket" | "serial")
   : "socket";
 
+// ? Initialize printer instance based on connection type
 const printer = new LiebingerClass(
   PRINTER_CONNECTION === "socket"
     ? {
@@ -70,6 +70,7 @@ type InitParams = {
   displayMessageBuffer: SharedArrayBuffer;
   isPrinterFinishedBuffer: SharedArrayBuffer;
 };
+// ? Initialization function for shared buffers
 const init = ({
   isPrintBuffer,
   printCounterBuffer,
@@ -88,6 +89,7 @@ const init = ({
   isPrinterFinished = new SharedPrimitive<boolean>(isPrinterFinishedBuffer);
 };
 
+// ? Function for wait until the printer connection is ready
 const waitConnectionReady = async () => {
   if (printer.getConnectionStatus() === "connect") {
     return true;
@@ -124,6 +126,7 @@ const waitConnectionReady = async () => {
   return printer.getConnectionStatus() === "connect";
 };
 
+// ? Function for getting the current counter from the printer
 const getCounter = async () => {
   const res = await new Promise<string>((resolve) => {
     const resHandler = (printerResponseBuffer: Buffer) => {
@@ -225,10 +228,10 @@ const run = async () => {
 
   // set first refill to true
   isFirstRefill = true;
-  lastUpdate = false;
   sameMailingStatusCounter = 0;
   lastMailingStatusKey = "";
 
+  setLastUpdate(false);
   const listener = listenPrinterResponse();
 
   if (printer.getConnectionStatus() !== "connect") {
@@ -268,12 +271,65 @@ const incrementPrintCounter = () => {
   return currentPrintCounter;
 };
 
+const getRefillCount = (values: {
+  fifoEntries: number;
+  maxPrintedQueueSize: number;
+  lastStartedPrintNo: number;
+}) => {
+  const { fifoEntries, maxPrintedQueueSize, lastStartedPrintNo } = values;
+  const toUpdateCount = lastStartedPrintNo - prevLastStartPrinNo;
+
+  const actualFifoEntries = isPrinterFinished.get()
+    ? fifoEntries - 1
+    : fifoEntries;
+
+  const emptySlot =
+    maxPrintedQueueSize - (actualFifoEntries + (isFirstRefill ? 0 : 1));
+
+  console.log("GET REFILL COUNT", {
+    toUpdateCount,
+    emptySlot,
+  });
+
+  /**
+   * Refill count based on lastStartedPrinNo when not first refill
+   * Program will use this formula if previous lastStartedPrinNo > 0
+   * and its not the first refill
+   */
+  if (prevLastStartPrinNo > 0 && toUpdateCount > 0 && !isFirstRefill) {
+    return toUpdateCount;
+  }
+
+  /**
+   * Refill count based on maxPrintedQueueSize and fifoEntries
+   * It will prevent mismatch updated value when user manual adjust counter on device without print any code
+   */
+  if ((actualFifoEntries > 0 || isFirstRefill) && emptySlot > 0) {
+    return emptySlot;
+  }
+
+  // Fallback value
+  return 0;
+};
+
+const setLastUpdate = (status: boolean) => {
+  lastUpdate = status;
+};
+
 // Handle Printer Status Response
 const handlePrinterStatus = async (printerResponse: string) => {
   const { machineState, errorState, nozzleState } =
     parseCheckPrinterStatus(printerResponse);
 
-  // console.log({ machineState, errorState, nozzleState, isFirstRun, isPrinterFinished: isPrinterFinished.get(), isPrinting: isPrinting.get() });
+  // console.log({
+  //   machineState,
+  //   errorState,
+  //   nozzleState,
+  //   isFirstRun,
+  //   isPrinterFinished: isPrinterFinished.get(),
+  //   isPrinting: isPrinting.get(),
+  //   lastUpdate,
+  // });
 
   // If there is no print action initiated from client
   if (!isPrinting.get() && lastUpdate) {
@@ -386,47 +442,6 @@ const handlePrinterStatus = async (printerResponse: string) => {
   }
 };
 
-const getRefillCount = (values: {
-  fifoEntries: number;
-  maxPrintedQueueSize: number;
-  lastStartedPrintNo: number;
-}) => {
-  const { fifoEntries, maxPrintedQueueSize, lastStartedPrintNo } = values;
-  const toUpdateCount = lastStartedPrintNo - prevLastStartPrinNo;
-
-  const actualFifoEntries = isPrinterFinished.get()
-    ? fifoEntries - 1
-    : fifoEntries;
-
-  const emptySlot =
-    maxPrintedQueueSize - (actualFifoEntries + (isFirstRefill ? 0 : 1));
-
-  console.log("GET REFILL COUNT", {
-    toUpdateCount,
-    emptySlot,
-  });
-
-  /**
-   * Refill count based on lastStartedPrinNo when not first refill
-   * Program will use this formula if previous lastStartedPrinNo > 0
-   * and its not the first refill
-   */
-  if (prevLastStartPrinNo > 0 && toUpdateCount > 0 && !isFirstRefill) {
-    return toUpdateCount;
-  }
-
-  /**
-   * Refill count based on maxPrintedQueueSize and fifoEntries
-   * It will prevent mismatch updated value when user manual adjust counter on device without print any code
-   */
-  if ((actualFifoEntries > 0 || isFirstRefill) && emptySlot > 0) {
-    return emptySlot;
-  }
-
-  // Fallback value
-  return 0;
-};
-
 const handleMailingStatus = async (printerResponse: string) => {
   const {
     fifoEntries,
@@ -509,7 +524,8 @@ const handleMailingStatus = async (printerResponse: string) => {
     }
 
     if (sameMailingStatusCounter >= 3 || fifoEntries <= 1) {
-      lastUpdate = true;
+      setLastUpdate(true);
+      // lastUpdate = true;
       await printer.stopPrint();
       await printer.checkMailingStatus();
     }
@@ -551,7 +567,10 @@ const handleMailingStatus = async (printerResponse: string) => {
 export const printerThread = {
   init,
   run,
+
+  /** for testing purpose */
   listenPrinterResponse,
+  setLastUpdate,
 };
 
 export type PrinterThread = typeof printerThread;

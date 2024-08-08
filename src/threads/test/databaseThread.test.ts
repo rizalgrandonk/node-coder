@@ -68,8 +68,8 @@ describe("DatabaseThread", () => {
     });
   });
 
-  it("should exit when isPrinting is false", async () => {
-    isPrinting.set(false);
+  it("should exit when isPrinterFinished", async () => {
+    isPrinterFinished.set(true);
     await databaseThread.run();
 
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
@@ -78,6 +78,7 @@ describe("DatabaseThread", () => {
 
   it("should exit and not get new uniquecodes when isPrinting is false", async () => {
     isPrinting.set(false);
+    isPrinterFinished.set(true);
     await databaseThread.run();
 
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
@@ -86,6 +87,7 @@ describe("DatabaseThread", () => {
 
   it("should exit when isPrinting is false and update if item exist", async () => {
     isPrinting.set(false);
+    isPrinterFinished.set(true);
     DBUpdateQueue.push(
       { id: 1000004, uniquecode: "00004" },
       { id: 1000005, uniquecode: "00005" }
@@ -120,6 +122,7 @@ describe("DatabaseThread", () => {
     await sleep(1);
 
     isPrinting.set(false);
+    isPrinterFinished.set(true);
 
     await runPromise;
 
@@ -161,6 +164,7 @@ describe("DatabaseThread", () => {
     ]);
 
     isPrinting.set(false);
+    isPrinterFinished.set(true);
 
     await runPromise;
   });
@@ -175,6 +179,8 @@ describe("DatabaseThread", () => {
     expect(printedQueue.size()).toBe(rawPrintedQueueData.length);
 
     isPrinting.set(false);
+    isPrinterFinished.set(true);
+
     await databaseThread.run();
 
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
@@ -195,6 +201,8 @@ describe("DatabaseThread", () => {
     expect(printQueue.size()).toBe(rawPrintQueueData.length);
 
     isPrinting.set(false);
+    isPrinterFinished.set(true);
+
     await databaseThread.run();
 
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
@@ -222,6 +230,8 @@ describe("DatabaseThread", () => {
     expect(printedQueue.size()).toBe(rawPrintedQueueData.length);
 
     isPrinting.set(false);
+    isPrinterFinished.set(true);
+
     await databaseThread.run();
 
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
