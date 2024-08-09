@@ -285,3 +285,9 @@ app.get("/stop-batch", async (req, res) => {
 httpServer.listen(7000, () => {
   console.log(`Server running on port: 7000`);
 });
+
+/**
+ * Build Comand with client
+ * npm --prefix ./client run build && tsc
+ *
+ */

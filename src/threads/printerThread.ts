@@ -23,8 +23,6 @@ const CONNECTION_ERROR_LIST = {
   ENDED: "PRINTER CONNECTION ENDED",
 };
 
-// console.log("Printer Thread Spawned");
-
 // ? Configuration for printer connection
 const PRINTER_CONNECTION = process.env.PRINTER_CONNECTION
   ? (process.env.PRINTER_CONNECTION as "socket" | "serial")
@@ -67,6 +65,17 @@ let lastUpdate: boolean = false;
 let lastMailingStatusKey: string;
 let sameMailingStatusCounter: number;
 let prevLastStartPrinNo: number;
+
+let isPrinterStopping: boolean = false;
+
+let mailingCounter: number;
+const setMailingCounter = (value: number) => {
+  mailingCounter = value;
+  return mailingCounter;
+};
+const incrementMailingCounter = () => {
+  return setMailingCounter(mailingCounter + 1);
+};
 
 type InitParams = {
   isPrintBuffer: SharedArrayBuffer;
@@ -113,6 +122,10 @@ const waitConnectionReady = async () => {
           printer.offConnectionChange(changeHandler);
           resolve(true);
         }
+
+        if (!isPrinting.get() && isPrinterFinished.get()) {
+          resolve(true);
+        }
       };
       printer.onConnectionChange(changeHandler);
     }),
@@ -126,37 +139,14 @@ const waitConnectionReady = async () => {
           resolve(true);
           clearInterval(interval);
         }
+        if (!isPrinting.get() && isPrinterFinished.get()) {
+          resolve(true);
+        }
       }, 1000);
     }),
   ]);
 
   return printer.getConnectionStatus() === "connect";
-};
-
-// ? Function for getting the current counter from the printer
-const getCounter = async () => {
-  const res = await new Promise<string>((resolve) => {
-    const resHandler = (printerResponseBuffer: Buffer) => {
-      const printerResponse = printerResponseBuffer.toString();
-      console.log({ printerResponse });
-      if (!printerResponse.includes("CC")) {
-        return;
-      }
-
-      printer.offData(resHandler);
-      return resolve(printerResponse);
-    };
-    printer.onData(resHandler);
-
-    printer.currentCounter();
-  });
-
-  console.log("res CC", res);
-
-  // Parsing response
-  const { productCounter } = parseCurrentCouter(res);
-
-  return productCounter;
 };
 
 const listenPrinterResponse = async () => {
@@ -166,14 +156,36 @@ const listenPrinterResponse = async () => {
       err?: Error
     ) => {
       if (status === "close") {
-        console.log("Printer Connection Closed");
+        console.log("Printer Connection Closed", printedQueue.size());
+        refillDBUpdateQueue(printedQueue.size());
+        isPrinting.set(false);
+        isPrinterFinished.set(true);
+
         clientDisplayMessage.set(CONNECTION_ERROR_LIST.CLOSED);
+
+        printer.offData(listenerHandler);
+        printer.offConnectionChange(connectionChangeHandler);
+        resolve();
       } else if (status === "error") {
-        console.log("Printer Connection Error", err);
+        console.log("Printer Connection Error", err, printedQueue.size());
+        refillDBUpdateQueue(printedQueue.size());
+        isPrinting.set(false);
+        isPrinterFinished.set(true);
         clientDisplayMessage.set(CONNECTION_ERROR_LIST.ERROR);
+
+        printer.offData(listenerHandler);
+        printer.offConnectionChange(connectionChangeHandler);
+        resolve();
       } else if (status === "end") {
-        console.log("Printer Connection Ended");
+        console.log("Printer Connection Ended", printedQueue.size());
+        refillDBUpdateQueue(printedQueue.size());
+        isPrinting.set(false);
+        isPrinterFinished.set(true);
         clientDisplayMessage.set(CONNECTION_ERROR_LIST.ENDED);
+
+        printer.offData(listenerHandler);
+        printer.offConnectionChange(connectionChangeHandler);
+        resolve();
       } else if (status === "connect") {
         console.log("Printer Connection Established");
         if (
@@ -188,8 +200,10 @@ const listenPrinterResponse = async () => {
     };
 
     const listenerHandler = async (printerResponseBuffer: Buffer) => {
-      // await sleep(1000);
       const printerResponse = printerResponseBuffer.toString();
+
+      console.log({ printerResponse });
+      await sleep(100);
 
       if (printer.getConnectionStatus() !== "connect") {
         console.log("LISTENER HANDLER - Connection Lost, wait till connect");
@@ -244,12 +258,14 @@ const listenPrinterResponse = async () => {
 const run = async () => {
   console.log("PRINTER THREAD RUN");
 
-  // set first refill to true
-  isFirstRefill = true;
+  // Reset Thread State
+  isPrinterStopping = false;
   sameMailingStatusCounter = 0;
   lastMailingStatusKey = "";
 
   setLastUpdate(false);
+  setFirstRefill(true);
+
   const listener = listenPrinterResponse();
 
   if (printer.getConnectionStatus() !== "connect") {
@@ -269,6 +285,9 @@ const run = async () => {
     console.log({ productCounter }, "AFTER SET");
   }
 
+  // ? Reset Mailing Counter
+  setMailingCounter(0);
+
   prevLastStartPrinNo = printCounter.get();
 
   await printer.checkPrinterStatus();
@@ -276,17 +295,10 @@ const run = async () => {
   console.log("AFTER CHECK PRINTER STATUS");
 
   // set first run to true
-  isFirstRun = true;
+  setFirstRun(true);
 
   console.log("WAIT LISTENER");
   await listener;
-};
-
-const incrementPrintCounter = () => {
-  const currentPrintCounter = printCounter.get() + 1;
-  printCounter.set(currentPrintCounter);
-
-  return currentPrintCounter;
 };
 
 const getRefillCount = (values: {
@@ -305,22 +317,69 @@ const getRefillCount = (values: {
 
   const emptySlot = maxPrintedQueueSize - fifoEntriesPrinter;
 
-  if (prevLastStartPrinNo > 0 && toUpdateCount > 0 && !isFirstRefill) {
-    console.log("toUpdateCount", toUpdateCount);
-    return toUpdateCount;
-  }
+  console.log({
+    fifoEntries,
+    isFirstRefill,
+    actualFifoEntries,
+    fifoEntriesPrinter,
+    emptySlot,
+    lastStartedPrintNo,
+    prevLastStartPrinNo,
+  });
 
   if (isFirstRefill) {
     isFirstRefill = false;
     return emptySlot;
   }
 
-  return fifoEntriesPrinter === printedQueue.size() ? 0 : emptySlot;
+  if (isPrinterStopping) {
+    return 0;
+  }
 
-  // console.log("GET REFILL COUNT", {
-  //   toUpdateCount,
-  //   emptySlot,
-  // });
+  if (!isFirstRefill && lastStartedPrintNo > 0) {
+    prevLastStartPrinNo = lastStartedPrintNo;
+  }
+
+  if (
+    printedQueue.size() <= 0 &&
+    fifoEntriesPrinter <= 1 &&
+    prevLastStartPrinNo > 0 &&
+    lastStartedPrintNo > 0 &&
+    prevLastStartPrinNo !== lastStartedPrintNo
+  ) {
+    return emptySlot;
+  }
+
+  if (
+    fifoEntriesPrinter === printedQueue.size() ||
+    fifoEntriesPrinter > printedQueue.size()
+  ) {
+    return 0;
+  }
+
+  if (prevLastStartPrinNo > 0 && lastStartedPrintNo > 0 && !isFirstRefill) {
+    if (
+      toUpdateCount <= 0 &&
+      printedQueue.size() - fifoEntriesPrinter > 0 &&
+      !isPrinterStopping
+    ) {
+      return printedQueue.size() - fifoEntriesPrinter;
+    }
+    console.log("toUpdateCount", toUpdateCount);
+    return Math.max(toUpdateCount, 0);
+  }
+
+  // return Math.max(printedQueue.size() - fifoEntriesPrinter, 0);
+  // return fifoEntriesPrinter === printedQueue.size() ||
+  //   fifoEntriesPrinter > printedQueue.size()
+  //   ? 0
+  //   : printedQueue.size() - fifoEntriesPrinter;
+
+  if (fifoEntriesPrinter > 0 && fifoEntriesPrinter < printedQueue.size()) {
+    return printedQueue.size() - fifoEntriesPrinter;
+  }
+
+  return 0;
 
   /**
    * Refill count based on lastStartedPrinNo when not first refill
@@ -352,10 +411,6 @@ const getRefillCount = (values: {
   // return 0;
 };
 
-const setLastUpdate = (status: boolean) => {
-  lastUpdate = status;
-};
-
 // Handle Printer Status Response
 const handlePrinterStatus = async (printerResponse: string) => {
   const { machineState, errorState, nozzleState } =
@@ -380,6 +435,9 @@ const handlePrinterStatus = async (printerResponse: string) => {
     if (machineState === MACHINE_STATE.READY) {
       console.log("disini stop print printer status");
       await printer.stopPrint();
+      // ? Set printer stop for get refill count
+      isPrinterStopping = true;
+
       await printer.checkPrinterStatus();
     }
 
@@ -390,7 +448,8 @@ const handlePrinterStatus = async (printerResponse: string) => {
       // Mask the current printer display
       // const currentPrintCounter = incrementPrintCounter();
       await printer.appendFifo(0, "XXXXXXXXXX");
-      console.log("AFTER SEND XXXX");
+
+      // Set Printer Finished to Stop DatabaseThread Process
       isPrinterFinished.set(true);
 
       /** --- PRINTING ENDED --- */
@@ -419,7 +478,8 @@ const handlePrinterStatus = async (printerResponse: string) => {
     }
 
     console.log("aku close error", errorState);
-    isFirstRefill = true;
+
+    setFirstRefill(true);
     await printer.closeError();
     await printer.checkPrinterStatus();
   }
@@ -448,6 +508,18 @@ const handlePrinterStatus = async (printerResponse: string) => {
     machineState != MACHINE_STATE.READY
   ) {
     console.log("aku start print", printerResponse);
+    isFirstRefill = true;
+
+    // ? Reset Print Counter
+    const productCounter = await getCounter();
+    console.log({ productCounter });
+    printCounter.set(productCounter);
+    console.log({ productCounter }, "AFTER SET IN START PRINT");
+
+    // ? Reset Mailing Counter
+    setMailingCounter(0);
+
+    isPrinterStopping = false;
     await printer.startPrint();
     await printer.checkPrinterStatus();
   }
@@ -458,14 +530,13 @@ const handlePrinterStatus = async (printerResponse: string) => {
     machineState === MACHINE_STATE.READY &&
     isFirstRun
   ) {
-    console.log("BEFORE RESET");
     await printer.flushFIFO();
     await printer.hideDisplay();
     await printer.enableEchoMode();
 
     console.log("AFTER RESET");
 
-    isFirstRun = false;
+    setFirstRun(false);
     await printer.checkPrinterStatus();
   }
 
@@ -524,24 +595,14 @@ const handleMailingStatus = async (printerResponse: string) => {
     DBUpdateQueue: DBUpdateQueue.size(),
     printerCounter: printCounter.get(),
     displayMessage: clientDisplayMessage.get(),
-    toUpdateCount: lastStartedPrintNo - prevLastStartPrinNo,
+    prevLastStartPrinNo,
   });
 
   // Set Last Start Print No
-  // if (!isFirstRefill) {
-  prevLastStartPrinNo = lastStartedPrintNo;
-  // }
 
   // Move Queue From Printed Queue To DB Update Queue
   if (currentPrintedQueueSize > 0 && refillCount > 0) {
-    for (let i = 0; i < refillCount; i++) {
-      const deletedPrinted = printedQueue.shift();
-
-      if (!deletedPrinted) {
-        break;
-      }
-      DBUpdateQueue.push(deletedPrinted);
-    }
+    refillDBUpdateQueue(refillCount);
   }
 
   /**
@@ -560,9 +621,11 @@ const handleMailingStatus = async (printerResponse: string) => {
     }
 
     if ((sameMailingStatusCounter >= 3 || fifoEntries <= 1) && !lastUpdate) {
-      setLastUpdate(true);
       console.log("disini stop print mailing status");
+      setLastUpdate(true);
       await printer.stopPrint();
+      isPrinterStopping = true;
+
       await printer.checkMailingStatus();
     }
 
@@ -581,8 +644,14 @@ const handleMailingStatus = async (printerResponse: string) => {
         break;
       }
       printedQueue.push(deletedPrint);
-      const currentPrintCounter = incrementPrintCounter();
-      const command = `^0=MR${currentPrintCounter}\t${deletedPrint.uniquecode}`;
+      const currentMailingCounter = incrementMailingCounter();
+      const command = `^0=MR${currentMailingCounter}\t${deletedPrint.uniquecode}`;
+
+      // Increment Print Counter
+      incrementPrintCounter();
+
+      // const currentPrintCounter = incrementPrintCounter();
+      // const command = `^0=MR${currentPrintCounter}\t${deletedPrint.uniquecode}`;
       sendUniqueCodeCommand.push(command);
     }
   }
@@ -591,6 +660,63 @@ const handleMailingStatus = async (printerResponse: string) => {
   if (sendUniqueCodeCommand.length > 0) {
     await printer.executeCommand(sendUniqueCodeCommand.join("\r") + "\r\n");
   }
+};
+
+const refillDBUpdateQueue = (refillCount: number) => {
+  console.log("refillDBUpdateQueue", refillCount);
+  for (let i = 0; i < refillCount; i++) {
+    const deletedPrinted = printedQueue.shift();
+
+    if (!deletedPrinted) {
+      break;
+    }
+    DBUpdateQueue.push(deletedPrinted);
+  }
+};
+
+// ? Function for getting the current counter from the printer
+const getCounter = async () => {
+  const res = await new Promise<string>((resolve) => {
+    const resHandler = (printerResponseBuffer: Buffer) => {
+      const printerResponse = printerResponseBuffer.toString();
+      console.log({ printerResponse });
+      if (!printerResponse.includes("CC")) {
+        return;
+      }
+
+      printer.offData(resHandler);
+      return resolve(printerResponse);
+    };
+    printer.onData(resHandler);
+
+    printer.currentCounter();
+  });
+
+  console.log("res CC", res);
+
+  // Parsing response
+  const { productCounter } = parseCurrentCouter(res);
+
+  return productCounter;
+};
+
+const incrementPrintCounter = () => {
+  const currentPrintCounter = printCounter.get() + 1;
+  printCounter.set(currentPrintCounter);
+
+  return currentPrintCounter;
+};
+
+const setLastUpdate = (status: boolean) => {
+  lastUpdate = status;
+};
+
+const setFirstRun = (status: boolean) => {
+  isFirstRun = status;
+};
+
+const setFirstRefill = (status: boolean) => {
+  isFirstRefill = status;
 };
 
 export const printerThread = {
