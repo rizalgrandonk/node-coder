@@ -16,6 +16,35 @@ import {
 } from "../utils/leibinger";
 import { isMainThread } from "worker_threads";
 
+/**
+ * TODO
+ * 0. Display Error under speed
+ * 1. Insert Error printer to codererrorlog
+ * 2. Insert Error connection to codererrorlog
+ * 3. Insert Error open nozzle timout to codererrorlog
+ * 4. Insert Error under speed
+ * 5. Insert Error under limit
+ *
+ */
+
+/**
+ * OPEN NOZZLE
+ * tercepat 30 detik -> 30000 ms // 7500ms
+ * terlama 60 detik -> 60000 ms // 120000
+ * 16 retry attempt
+ *
+ * interval = tercepat / 4
+ * max attempt = terlama * 2 / interval
+ */
+
+// Delay Interval when opening nozzle
+const NOZZLE_OPEN_DELAY = Number(process.env.NOZZLE_OPEN_DELAY ?? 7500);
+// Maximum Nozzle Delay Attempt
+const MAX_NOZZLE_OPEN_ATTEMPT = Number(
+  process.env.MAX_NOZZLE_OPEN_ATTEMPT ?? 16
+);
+
+// ? Configuration for printer
 const MIN_PRINT_QUEUE = Number(process.env.MIN_PRINT_QUEUE ?? 180);
 const CONNECTION_ERROR_LIST = {
   CLOSED: "PRINTER CONNECTION CLOSED",
@@ -65,6 +94,8 @@ let lastUpdate: boolean = false;
 let lastMailingStatusKey: string;
 let sameMailingStatusCounter: number;
 let prevLastStartPrinNo: number = 0;
+
+let openNozzleAttempt = 0;
 
 // let isPrinterStopping: boolean = false;
 
@@ -505,7 +536,17 @@ const handlePrinterStatus = async (printerResponse: string) => {
   // Update Client Display Message if nozzle is in OPENING state
   else if (nozzleState === NOZZLE_STATE.OPENING) {
     clientDisplayMessage.set("OPENING NOZZLE");
-    await sleep(500);
+
+    if (openNozzleAttempt > MAX_NOZZLE_OPEN_ATTEMPT) {
+      // Display Error
+      clientDisplayMessage.set("OPENING NOZZLE TIMEOUT");
+
+      // Create Error Log
+    }
+
+    openNozzleAttempt++;
+
+    await sleep(NOZZLE_OPEN_DELAY);
     await printer.checkPrinterStatus();
   }
 
@@ -515,7 +556,7 @@ const handlePrinterStatus = async (printerResponse: string) => {
     machineState != MACHINE_STATE.READY
   ) {
     console.log("aku start print", printerResponse);
-    isFirstRefill = true;
+    setFirstRefill(true);
 
     // ? Reset Print Counter
     const productCounter = await getCounter();

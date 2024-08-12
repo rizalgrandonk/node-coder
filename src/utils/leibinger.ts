@@ -2,11 +2,16 @@
 export const parseCheckPrinterStatus = (response: string) => {
   // Parse the response
   const parts = response.split(/\s+/);
+
+  const errorState = parseInt(parts[2], 10);
+  const errorPair = 33554431;
+  const errorCode = errorState & errorPair;
+
   return {
     response,
     nozzleState: parseInt(parts[0].split("=RS")[1], 10),
     machineState: parseInt(parts[1], 10),
-    errorState: parseInt(parts[2], 10),
+    errorState: errorCode,
     headCover: parseInt(parts[3], 10),
     actSpeed: parseInt(parts[4], 10),
   };
@@ -35,8 +40,8 @@ export const parseCheckMailingStatus = (response: string) => {
 
 // Helper method to parse the current counter
 export const parseCurrentCouter = (response: string) => {
-  // Par1: Product Counter 
-  // Par2: Stop after X Products 
+  // Par1: Product Counter
+  // Par2: Stop after X Products
   // Par3: Total print counter
 
   // Parse the response
@@ -47,5 +52,4 @@ export const parseCurrentCouter = (response: string) => {
     stopoAfter: parseInt(parts[1], 10),
     totalPrintCounter: parseInt(parts[2], 10),
   };
-
-}
+};
