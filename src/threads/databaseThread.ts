@@ -14,6 +14,7 @@ const MIN_PRINT_QUEUE = Number(process.env.MIN_PRINT_QUEUE ?? 180);
 let isPrinting: SharedPrimitive<boolean>;
 let isPrinterFinished: SharedPrimitive<boolean>;
 let printerCounter: SharedPrimitive<number>;
+let printedUpdateCount: SharedPrimitive<number>;
 let displayMessage: SharedPrimitive<string>;
 let printQueue: SharedQueue;
 let printedQueue: SharedQueue;
@@ -23,6 +24,7 @@ type InitParams = {
   isPrintBuffer: SharedArrayBuffer;
   isPrinterFinishedBuffer: SharedArrayBuffer;
   printerCounterBuffer: SharedArrayBuffer;
+  printedUpdateCountBuffer: SharedArrayBuffer;
   printBuffer: SharedArrayBuffer;
   printedBuffer: SharedArrayBuffer;
   DBUpdateBuffer: SharedArrayBuffer;
@@ -36,10 +38,12 @@ const init = ({
   DBUpdateBuffer,
   printerCounterBuffer,
   displayMessageBuffer,
+  printedUpdateCountBuffer,
 }: InitParams) => {
   isPrinting = new SharedPrimitive<boolean>(isPrintBuffer);
   isPrinterFinished = new SharedPrimitive<boolean>(isPrinterFinishedBuffer);
   printerCounter = new SharedPrimitive<number>(printerCounterBuffer);
+  printedUpdateCount = new SharedPrimitive<number>(printedUpdateCountBuffer);
   displayMessage = new SharedPrimitive<string>(displayMessageBuffer);
   printQueue = new SharedQueue(printBuffer);
   printedQueue = new SharedQueue(printedBuffer);
@@ -54,21 +58,21 @@ const run = async () => {
     printedQueue.size() > 0
   ) {
     if (DBUpdateQueue.size() > 0) {
-      await updateBuffer(DBUpdateQueue.shiftAll());
+      const DBUpdateItems = DBUpdateQueue.shiftAll();
+      await updateBuffer(DBUpdateItems);
+      printedUpdateCount.set(printedUpdateCount.get() + DBUpdateItems.length);
     }
     if (isPrinterFinished.get()) {
       if (printQueue.size() > 0 || printedQueue.size() > 0) {
-        const printedSize = printedQueue.size();
+        const printedItems = printedQueue.shiftAll();
+        const printItems = printQueue.shiftAll();
 
-        await resetBuffer([
-          ...printQueue.shiftAll(),
-          ...printedQueue.shiftAll(),
-        ]);
+        await resetBuffer([...printItems, ...printedItems]);
         // ! TEMPORARY FOR TEST
         // printQueue.shiftAll();
         // printedQueue.shiftAll();
 
-        printerCounter.set(printerCounter.get() - printedSize);
+        printerCounter.set(printerCounter.get() - printedItems.length);
       }
     }
 

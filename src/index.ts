@@ -38,6 +38,7 @@ const MAX_QUEUE = Number(process.env.MAX_QUEUE ?? 254);
 const isPrinting = new SharedPrimitive<boolean>(false);
 const printerCounter = new SharedPrimitive<number>(0);
 const displayMessage = new SharedPrimitive<string>("");
+const printedUpdateCount = new SharedPrimitive<number>(0);
 
 const isPrinterFinished = new SharedPrimitive<boolean>(false);
 
@@ -63,6 +64,8 @@ const startBatch = async (info: {
 }) => {
   batchInfo = info;
 
+  printedUpdateCount.set(0);
+
   databaseThread = await spawn<DatabaseThread>(
     new ThreadWorker("./threads/databaseThread")
   );
@@ -73,6 +76,7 @@ const startBatch = async (info: {
   await databaseThread.init({
     isPrintBuffer: isPrinting.getBuffer(),
     printerCounterBuffer: printerCounter.getBuffer(),
+    printedUpdateCountBuffer: printedUpdateCount.getBuffer(),
     printBuffer: printQueue.getBuffer(),
     printedBuffer: printedQueue.getBuffer(),
     DBUpdateBuffer: DBUpdateQueue.getBuffer(),
@@ -139,13 +143,17 @@ const startPrintProcess = async () => {
     //   displayMessage: displayMessage.get(),
     // });
 
+    const productCounter = await printerThread.getCounter();
+
     io.emit("printStatus", {
       // isPrinting: isPrinting.get(),
       printQueue: printQueue.size(),
       printedQueue: printedQueue.size(),
       // DBUpdateQueue: DBUpdateQueue.size(),
-      printerCounter: printerCounter.get(),
-      printedCount: printerCounter.get() - printedQueue.size(),
+      // printerCounter: printerCounter.get(),
+      // printedCount: printerCounter.get() - printedQueue.size(),
+      productCounter,
+      printedCount: printedUpdateCount.get(),
       displayMessage: displayMessage.get(),
     });
 
@@ -253,17 +261,12 @@ app.get("/start-print", (req, res) => {
 });
 
 app.get("/stop-print", async (req, res) => {
-  // TODO : Prevent Stop Print if connection lost
   isPrinting.set(false);
-
-  // await printProcess
   return res.status(200).json({ message: "Success" });
 });
 
 app.get("/stop-batch", async (req, res) => {
   isPrinting.set(false);
-
-  // await printProcess
 
   if (databaseThread) {
     await Thread.terminate(databaseThread);
