@@ -1,15 +1,16 @@
 import db from "../db";
 
 type CodeErrorLogType = {
-  errormessage: string;
-  errorTimestamp: Date;
   batchno: string;
-  sendconfirmed: Date;
   batchid: number;
   markingprinterid: number;
+  errormessage: string;
+  errorTimestamp?: Date;
+  sendconfirmed?: Date;
+  created?: Date;
 };
 
-export const insertSerialUniquecode = async (params: CodeErrorLogType) => {
+export const insertErrorLog = async (params: CodeErrorLogType) => {
   const {
     markingprinterid = 9999,
     batchid = 328,
@@ -17,9 +18,8 @@ export const insertSerialUniquecode = async (params: CodeErrorLogType) => {
     sendconfirmed = new Date(),
     errormessage,
     errorTimestamp,
+    created = new Date(),
   } = params;
-
-  const created = new Date();
 
   const query = `
     INSERT INTO codererrorlog
@@ -28,6 +28,7 @@ export const insertSerialUniquecode = async (params: CodeErrorLogType) => {
       $1, $2, $3, $4, $5, $6, $7)
   `;
 
+  console.log("insertErrorLog", { query });
   const result = await db.query(query, [
     errormessage,
     errorTimestamp,

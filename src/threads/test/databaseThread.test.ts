@@ -5,10 +5,7 @@ import {
   resetBulkBuffered,
 } from "../../services/uniquecodes";
 import { SharedPrimitive, SharedQueue } from "../../utils/sharedBuffer";
-
-const sleep = async (time: number) => {
-  return await new Promise((res) => setTimeout(res, time));
-};
+import { sleep } from "../../utils/helper";
 
 // Only mock the database services
 jest.mock("../../services/uniquecodes");
@@ -33,6 +30,7 @@ const mockedResetBulkBuffered = resetBulkBuffered as jest.MockedFunction<
 >;
 
 describe("DatabaseThread", () => {
+  // Declare variables for the DatabaseThread and shared data structures
   let databaseThread: DatabaseThread;
   let isPrinting: SharedPrimitive<boolean>;
   let isPrinterFinished: SharedPrimitive<boolean>;
@@ -43,10 +41,12 @@ describe("DatabaseThread", () => {
   let displayMessage: SharedPrimitive<string>;
   let printedUpdateCount: SharedPrimitive<number>;
 
+  // This function runs before each test, setting up the environment
   beforeEach(() => {
+    // Reset all mocks to ensure each test is isolated
     jest.resetAllMocks();
 
-    // Create actual SharedPrimitive and SharedQueue instances
+    // Initialize actual SharedPrimitive and SharedQueue instances
     isPrinting = new SharedPrimitive<boolean>(false);
     isPrinterFinished = new SharedPrimitive<boolean>(false);
     printerCounter = new SharedPrimitive<number>(0);
@@ -56,12 +56,12 @@ describe("DatabaseThread", () => {
     printedQueue = new SharedQueue(400);
     DBUpdateQueue = new SharedQueue(400);
 
-    // Import the module dynamically to reset the module state
+    // Dynamically import the DatabaseThread module to reset its state
     jest.isolateModules(() => {
       databaseThread = require("../databaseThread").databaseThread;
     });
 
-    // Initialize the thread with real shared buffers
+    // Initialize the databaseThread with the shared buffers
     databaseThread.init({
       isPrintBuffer: isPrinting.getBuffer(),
       isPrinterFinishedBuffer: isPrinterFinished.getBuffer(),
@@ -74,33 +74,39 @@ describe("DatabaseThread", () => {
     });
   });
 
+  // Test that the thread exits immediately if printing has finished
   it("should exit when isPrinterFinished", async () => {
-    isPrinterFinished.set(true);
-    await databaseThread.run();
+    isPrinterFinished.set(true); // Simulate the printer finishing its job
+    await databaseThread.run(); // Run the thread
 
+    // Ensure that no database operations are called
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
     expect(mockedSetBulkPrintedStatus).not.toHaveBeenCalled();
   });
 
+  // Test that the thread exits if printing is not in progress
   it("should exit and not get new uniquecodes when isPrinting is false", async () => {
-    isPrinting.set(false);
-    isPrinterFinished.set(true);
-    await databaseThread.run();
+    isPrinting.set(false); // Simulate that the printer is not printing
+    isPrinterFinished.set(true); // Simulate that the printer has finished
+    await databaseThread.run(); // Run the thread
 
+    // Ensure that no database operations are called
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
     expect(mockedSetBulkPrintedStatus).not.toHaveBeenCalled();
   });
 
+  // Test that the thread updates the database when items exist in the DBUpdateQueue
   it("should exit when isPrinting is false and update if item exist", async () => {
-    isPrinting.set(false);
-    isPrinterFinished.set(true);
+    isPrinting.set(false); // Simulate that the printer is not printing
+    isPrinterFinished.set(true); // Simulate that the printer has finished
     DBUpdateQueue.push(
       { id: 1000004, uniquecode: "00004" },
       { id: 1000005, uniquecode: "00005" }
-    );
+    ); // Add items to the DBUpdateQueue
 
-    await databaseThread.run();
+    await databaseThread.run(); // Run the thread
 
+    // Ensure that no new unique codes are fetched, but bulk printed status is updated
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
     expect(mockedSetBulkPrintedStatus).toHaveBeenCalled();
     expect(mockedSetBulkPrintedStatus).toHaveBeenCalledWith(
@@ -109,29 +115,32 @@ describe("DatabaseThread", () => {
     );
   });
 
+  // Test that the thread processes DBUpdateQueue items when printing is active
   it("should update buffer when DBUpdateQueue has items", async () => {
-    isPrinting.set(true);
+    isPrinting.set(true); // Simulate that the printer is printing
     DBUpdateQueue.push(
       { id: 1000004, uniquecode: "00004" },
       { id: 1000005, uniquecode: "00005" }
-    );
+    ); // Add items to the DBUpdateQueue
     printQueue.push(
       ...Array.from(new Array(200), (_, index) => ({
         id: 1000000 + index + 1,
         uniquecode: `CODE${index + 1}`,
       }))
-    );
+    ); // Populate printQueue with some items
 
-    const runPromise = databaseThread.run();
+    const runPromise = databaseThread.run(); // Start running the thread
 
-    // Wait a short time to allow the function to process
+    // Simulate a short delay to allow the thread to process
     await sleep(1);
 
+    // Simulate stopping the print and finishing the job
     isPrinting.set(false);
     isPrinterFinished.set(true);
 
-    await runPromise;
+    await runPromise; // Await the completion of the thread
 
+    // Ensure that the thread processed the DBUpdateQueue and updated bulk printed status
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
     expect(mockedSetBulkPrintedStatus).toHaveBeenCalled();
     expect(mockedSetBulkPrintedStatus).toHaveBeenCalledWith(
@@ -140,28 +149,32 @@ describe("DatabaseThread", () => {
     );
   });
 
+  // Test that the thread fetches new unique codes when the printQueue is below a certain size
   it("should populate buffer when printQueue is below MIN_QUEUE", async () => {
     const rawQueueData = Array.from(new Array(50), (_, index) => ({
       id: 1000000 + index + 1,
       uniquecode: `CODE${index + 1}`,
-    }));
-    isPrinting.set(true);
+    })); // Create initial printQueue data
+    isPrinting.set(true); // Simulate that the printer is printing
     DBUpdateQueue.push(
       { id: 1000004, uniquecode: "00004" },
       { id: 1000005, uniquecode: "00005" }
-    );
-    printQueue.push(...rawQueueData);
+    ); // Add items to the DBUpdateQueue
+    printQueue.push(...rawQueueData); // Add raw data to printQueue
 
+    // Mock fetching new unique codes from the database
     mockedGetUniquecodes.mockResolvedValue([
       { id: 1111000, uniquecode: "NEW_CODE" },
     ]);
 
-    expect(printQueue.size()).toBe(rawQueueData.length);
+    expect(printQueue.size()).toBe(rawQueueData.length); // Check initial printQueue size
 
-    const runPromise = databaseThread.run();
+    const runPromise = databaseThread.run(); // Start running the thread
 
-    // Wait a short time to allow the function to process
+    // Simulate a short delay to allow the thread to process
     await sleep(1);
+
+    // Ensure new unique codes are fetched and added to the queue
     expect(mockedGetUniquecodes).toHaveBeenCalled();
     expect(printQueue.size()).toEqual(rawQueueData.length + 1);
     expect(printQueue.getAll()).toEqual([
@@ -169,84 +182,91 @@ describe("DatabaseThread", () => {
       { id: 1111000, uniquecode: "NEW_CODE" },
     ]);
 
+    // Simulate stopping the print and finishing the job
     isPrinting.set(false);
     isPrinterFinished.set(true);
 
-    await runPromise;
+    await runPromise; // Await the completion of the thread
   });
 
+  // Test that the thread resets any remaining unique codes in the printedQueue when printing stops
   it("should exit and reset uniquecodes left in printed queue when isPrinting is false", async () => {
     const rawPrintedQueueData = Array.from(new Array(50), (_, index) => ({
       id: 1000000 + index + 1,
       uniquecode: `CODE${index + 1}`,
-    }));
-    printedQueue.push(...rawPrintedQueueData);
+    })); // Create initial printedQueue data
+    printedQueue.push(...rawPrintedQueueData); // Add raw data to printedQueue
 
-    expect(printedQueue.size()).toBe(rawPrintedQueueData.length);
+    expect(printedQueue.size()).toBe(rawPrintedQueueData.length); // Check initial printedQueue size
 
-    isPrinting.set(false);
-    isPrinterFinished.set(true);
+    isPrinting.set(false); // Simulate that the printer is not printing
+    isPrinterFinished.set(true); // Simulate that the printer has finished
 
-    await databaseThread.run();
+    await databaseThread.run(); // Run the thread
 
+    // Ensure that the thread resets the buffered unique codes and empties the queue
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
     expect(mockedResetBulkBuffered).toHaveBeenCalled();
     expect(mockedResetBulkBuffered).toHaveBeenCalledWith(
       rawPrintedQueueData.map((uc) => uc.id)
     );
-    expect(printedQueue.size()).toBe(0);
+    expect(printedQueue.size()).toBe(0); // Ensure the printedQueue is empty
   });
 
+  // Test that the thread resets any remaining unique codes in the printQueue when printing stops
   it("should exit and reset uniquecodes left in print queue when isPrinting is false", async () => {
     const rawPrintQueueData = Array.from(new Array(100), (_, index) => ({
       id: 1000000 + index + 1,
       uniquecode: `CODE${index + 1}`,
-    }));
-    printQueue.push(...rawPrintQueueData);
+    })); // Create initial printQueue data
+    printQueue.push(...rawPrintQueueData); // Add raw data to printQueue
 
-    expect(printQueue.size()).toBe(rawPrintQueueData.length);
+    expect(printQueue.size()).toBe(rawPrintQueueData.length); // Check initial printQueue size
 
-    isPrinting.set(false);
-    isPrinterFinished.set(true);
+    isPrinting.set(false); // Simulate that the printer is not printing
+    isPrinterFinished.set(true); // Simulate that the printer has finished
 
-    await databaseThread.run();
+    await databaseThread.run(); // Run the thread
 
+    // Ensure that the thread resets the buffered unique codes and empties the queue
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
     expect(mockedResetBulkBuffered).toHaveBeenCalled();
     expect(mockedResetBulkBuffered).toHaveBeenCalledWith(
       rawPrintQueueData.map((uc) => uc.id)
     );
-    expect(printQueue.size()).toBe(0);
+    expect(printQueue.size()).toBe(0); // Ensure the printQueue is empty
   });
 
+  // Test that the thread resets any remaining unique codes in both the printQueue and printedQueue when printing stops
   it("should exit and reset uniquecodes left in print and printed queue when isPrinting is false", async () => {
     const rawPrintQueueData = Array.from(new Array(100), (_, index) => ({
       id: 1000000 + index + 1,
       uniquecode: `CODE${index + 1}`,
-    }));
-    printQueue.push(...rawPrintQueueData);
+    })); // Create initial printQueue data
+    printQueue.push(...rawPrintQueueData); // Add raw data to printQueue
 
     const rawPrintedQueueData = Array.from(new Array(50), (_, index) => ({
       id: 1000000 + index + 1,
       uniquecode: `CODE${index + 1}`,
-    }));
-    printedQueue.push(...rawPrintedQueueData);
+    })); // Create initial printedQueue data
+    printedQueue.push(...rawPrintedQueueData); // Add raw data to printedQueue
 
-    expect(printQueue.size()).toBe(rawPrintQueueData.length);
-    expect(printedQueue.size()).toBe(rawPrintedQueueData.length);
+    expect(printQueue.size()).toBe(rawPrintQueueData.length); // Check initial printQueue size
+    expect(printedQueue.size()).toBe(rawPrintedQueueData.length); // Check initial printedQueue size
 
-    isPrinting.set(false);
-    isPrinterFinished.set(true);
+    isPrinting.set(false); // Simulate that the printer is not printing
+    isPrinterFinished.set(true); // Simulate that the printer has finished
 
-    await databaseThread.run();
+    await databaseThread.run(); // Run the thread
 
+    // Ensure that the thread resets the buffered unique codes and empties both queues
     expect(mockedGetUniquecodes).not.toHaveBeenCalled();
     expect(mockedResetBulkBuffered).toHaveBeenCalled();
     expect(mockedResetBulkBuffered).toHaveBeenCalledWith([
       ...rawPrintQueueData.map((uc) => uc.id),
       ...rawPrintedQueueData.map((uc) => uc.id),
     ]);
-    expect(printQueue.size()).toBe(0);
-    expect(printedQueue.size()).toBe(0);
+    expect(printQueue.size()).toBe(0); // Ensure the printQueue is empty
+    expect(printedQueue.size()).toBe(0); // Ensure the printedQueue is empty
   });
 });

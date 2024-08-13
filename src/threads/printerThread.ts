@@ -15,6 +15,15 @@ import {
   parseCurrentCouter,
 } from "../utils/leibinger";
 import { isMainThread } from "worker_threads";
+import { insertErrorLog } from "../services/codererrorlogs";
+import {
+  QUEUE_ERROR_LIST,
+  CONNECTION_ERROR_LIST,
+  isConnectionError,
+  PRINTER_ERROR_LIST,
+  PRINTER_MESSAGE_LIST,
+  ErrorList,
+} from "../utils/errors";
 
 /**
  * TODO
@@ -30,7 +39,7 @@ import { isMainThread } from "worker_threads";
 /**
  * OPEN NOZZLE
  * tercepat 30 detik -> 30000 ms // 7500ms
- * terlama 60 detik -> 60000 ms // 120000
+ * terlama 33 detik -> 33000 ms // 60000
  * 16 retry attempt
  *
  * interval = tercepat / 4
@@ -41,16 +50,13 @@ import { isMainThread } from "worker_threads";
 const NOZZLE_OPEN_DELAY = Number(process.env.NOZZLE_OPEN_DELAY ?? 7500);
 // Maximum Nozzle Delay Attempt
 const MAX_NOZZLE_OPEN_ATTEMPT = Number(
-  process.env.MAX_NOZZLE_OPEN_ATTEMPT ?? 16
+  process.env.MAX_NOZZLE_OPEN_ATTEMPT ?? 8
 );
 
 // ? Configuration for printer
 const MIN_PRINT_QUEUE = Number(process.env.MIN_PRINT_QUEUE ?? 180);
-const CONNECTION_ERROR_LIST = {
-  CLOSED: "PRINTER CONNECTION CLOSED",
-  ERROR: "PRINTER CONNECTION ERROR",
-  ENDED: "PRINTER CONNECTION ENDED",
-};
+const MAX_PRINTED_QUEUE = Number(process.env.MAX_PRINTED_QUEUE ?? 60);
+const MAX_QUEUE_REFILL = Number(process.env.MAX_QUEUE_REFILL ?? 30);
 
 // ? Configuration for printer connection
 const PRINTER_CONNECTION = process.env.PRINTER_CONNECTION
@@ -191,41 +197,46 @@ const listenPrinterResponse = async () => {
       if (status === "close") {
         console.log("Printer Connection Closed", printedQueue.size());
         refillDBUpdateQueue(printedQueue.size());
+
         isPrinting.set(false);
         isPrinterFinished.set(true);
 
         clientDisplayMessage.set(CONNECTION_ERROR_LIST.CLOSED);
+        await createErrorLog(CONNECTION_ERROR_LIST.CLOSED);
 
         printer.offData(listenerHandler);
         printer.offConnectionChange(connectionChangeHandler);
+
         resolve();
       } else if (status === "error") {
         console.log("Printer Connection Error", err, printedQueue.size());
         refillDBUpdateQueue(printedQueue.size());
+
         isPrinting.set(false);
         isPrinterFinished.set(true);
+
         clientDisplayMessage.set(CONNECTION_ERROR_LIST.ERROR);
+        await createErrorLog(CONNECTION_ERROR_LIST.ERROR);
 
         printer.offData(listenerHandler);
         printer.offConnectionChange(connectionChangeHandler);
+
         resolve();
       } else if (status === "end") {
         console.log("Printer Connection Ended", printedQueue.size());
         refillDBUpdateQueue(printedQueue.size());
         isPrinting.set(false);
         isPrinterFinished.set(true);
+
         clientDisplayMessage.set(CONNECTION_ERROR_LIST.ENDED);
+        await createErrorLog(CONNECTION_ERROR_LIST.ENDED);
 
         printer.offData(listenerHandler);
         printer.offConnectionChange(connectionChangeHandler);
         resolve();
       } else if (status === "connect") {
         console.log("Printer Connection Established");
-        if (
-          Object.values(CONNECTION_ERROR_LIST).includes(
-            clientDisplayMessage.get()
-          )
-        ) {
+        if (isConnectionError(clientDisplayMessage.get())) {
           clientDisplayMessage.set("");
           await printer.checkPrinterStatus();
         }
@@ -247,6 +258,7 @@ const listenPrinterResponse = async () => {
 
       if (!printerResponse.startsWith("^0")) {
         clientDisplayMessage.set(printerResponse);
+        await createErrorLog(printerResponse);
         if (printedQueue.size() > 0) {
           // Flush Printed Queue
           const deletedQueue = printedQueue.shiftAll();
@@ -283,7 +295,6 @@ const listenPrinterResponse = async () => {
     };
 
     printer.onData(listenerHandler);
-
     printer.onConnectionChange(connectionChangeHandler);
   });
 };
@@ -467,7 +478,7 @@ const handlePrinterStatus = async (printerResponse: string) => {
   // If there is no print action initiated from client
   if (!isPrinting.get() && lastUpdate) {
     console.log("STOP PRINTING");
-    clientDisplayMessage.set("STOP PRINTING");
+    clientDisplayMessage.set(PRINTER_MESSAGE_LIST.STOP_PRINT);
 
     // Stop Printer Status
     if (machineState === MACHINE_STATE.READY) {
@@ -508,11 +519,13 @@ const handlePrinterStatus = async (printerResponse: string) => {
     // Update Client Display Message if error is not identified
     if (identifiedErrors?.length <= 0) {
       clientDisplayMessage.set(`Unidentified Error Code: ${errorState}`);
+      await createErrorLog(`Unidentified Error Code: ${errorState}`);
     }
 
     // Update Client Display Message if error is not skipable error
     else if (identifiedErrors?.length > 0 && !skipableError) {
       clientDisplayMessage.set(identifiedErrors[0]?.errorname);
+      await createErrorLog(identifiedErrors[0]?.errorname);
     }
 
     console.log("aku close error", errorState);
@@ -529,19 +542,23 @@ const handlePrinterStatus = async (printerResponse: string) => {
     nozzleState === NOZZLE_STATE.INBETWEEN
   ) {
     await printer.openNozzle();
-    clientDisplayMessage.set("OPENING NOZZLE");
+    clientDisplayMessage.set(PRINTER_MESSAGE_LIST.OPENINNG_NOZZLE);
     await printer.checkPrinterStatus();
   }
 
   // Update Client Display Message if nozzle is in OPENING state
   else if (nozzleState === NOZZLE_STATE.OPENING) {
-    clientDisplayMessage.set("OPENING NOZZLE");
+    console.log({ openNozzleAttempt });
+    clientDisplayMessage.set(PRINTER_MESSAGE_LIST.OPENINNG_NOZZLE);
 
-    if (openNozzleAttempt > MAX_NOZZLE_OPEN_ATTEMPT) {
+    if (openNozzleAttempt >= MAX_NOZZLE_OPEN_ATTEMPT) {
       // Display Error
-      clientDisplayMessage.set("OPENING NOZZLE TIMEOUT");
-
+      clientDisplayMessage.set(PRINTER_ERROR_LIST.OPEN_NOZZLE_TIMEOUT);
       // Create Error Log
+      await createErrorLog(PRINTER_ERROR_LIST.OPEN_NOZZLE_TIMEOUT);
+
+      isPrinting.set(false);
+      isPrinterFinished.set(true);
     }
 
     openNozzleAttempt++;
@@ -596,13 +613,13 @@ const handlePrinterStatus = async (printerResponse: string) => {
     !isFirstRun
   ) {
     // Reset Display Error Message
-    if (
-      !Object.values(CONNECTION_ERROR_LIST).includes(clientDisplayMessage.get())
-    ) {
+    if (!isConnectionError(clientDisplayMessage.get())) {
       if (printQueue.size() <= 0 && printedQueue.size() <= 0) {
-        clientDisplayMessage.set("MAILING BUFFER EMPTY");
+        clientDisplayMessage.set(QUEUE_ERROR_LIST.MAILING_BUFFER_EMPTY);
+        await createErrorLog(QUEUE_ERROR_LIST.MAILING_BUFFER_EMPTY);
       } else if (printQueue.size() < MIN_PRINT_QUEUE) {
-        clientDisplayMessage.set("PRINT BUFFER UNDER LIMIT");
+        clientDisplayMessage.set(QUEUE_ERROR_LIST.UNDER_LIMIT);
+        await createErrorLog(QUEUE_ERROR_LIST.UNDER_LIMIT);
       } else {
         clientDisplayMessage.set("");
       }
@@ -621,11 +638,9 @@ const handleMailingStatus = async (printerResponse: string) => {
     lastStartedPrintNoWasFinished,
   } = parseCheckMailingStatus(printerResponse);
 
-  const maxPrintedQueueSize = Number(process.env.MAX_PRINTED_QUEUE ?? 60);
-
   const refillCount = getRefillCount({
     fifoEntries,
-    maxPrintedQueueSize,
+    maxPrintedQueueSize: MAX_PRINTED_QUEUE,
     lastStartedPrintNo,
   });
 
@@ -636,7 +651,7 @@ const handleMailingStatus = async (printerResponse: string) => {
     fifoDepth,
     lastStartedPrintNo,
     lastStartedPrintNoWasFinished,
-    maxPrintedQueueSize,
+    MAX_PRINTED_QUEUE,
     refillCount,
     lastUpdate,
     isFirstRun,
@@ -649,7 +664,11 @@ const handleMailingStatus = async (printerResponse: string) => {
     prevLastStartPrinNo,
   });
 
-  // Set Last Start Print No
+  // Create error if refillCount is HIGHER  MAX_QUEUE_REFILL
+  if (refillCount > MAX_QUEUE_REFILL && !isFirstRefill && !lastUpdate) {
+    clientDisplayMessage.set(QUEUE_ERROR_LIST.UNDER_SPEED);
+    await createErrorLog(QUEUE_ERROR_LIST.UNDER_SPEED);
+  }
 
   // Move Queue From Printed Queue To DB Update Queue
   if (currentPrintedQueueSize > 0 && refillCount > 0) {
@@ -763,6 +782,21 @@ const getCounter = async () => {
   return productCounter;
 };
 
+const createErrorLog = async (message: string) => {
+  console.log("createErrorLog", message);
+  return await insertErrorLog({
+    batchid: 1,
+    batchno: "TEST-BATCH",
+    errormessage: message,
+    errorTimestamp: new Date(),
+    markingprinterid: 1,
+    sendconfirmed: new Date(),
+  }).catch((err) => {
+    console.log("Error create error log", err);
+    return null;
+  });
+};
+
 const incrementPrintCounter = () => {
   const currentPrintCounter = printCounter.get() + 1;
   printCounter.set(currentPrintCounter);
@@ -789,6 +823,8 @@ export const printerThread = {
   /** for testing purpose */
   listenPrinterResponse,
   setLastUpdate,
+  setFirstRefill,
+  setFirstRun,
   getCounter,
 };
 

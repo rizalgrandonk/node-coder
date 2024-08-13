@@ -7,7 +7,7 @@ import { Server } from "socket.io";
 import express from "express";
 import mainRoutes from "./routes/index";
 import SerialConnection from "./connections/serial";
-import { insertSerialUniquecode } from "./services/codererrorlogs";
+// import { insertSerialUniquecode } from "./services/codererrorlogs";
 import { DatabaseThread } from "./threads/databaseThread";
 import { PrinterThread } from "./threads/printerThread";
 
