@@ -92,7 +92,7 @@ export const setBulkUNEStatus = async (
   const coderstatus = "UNE";
   const query = `
     UPDATE uniquecode
-    SET coderstatus=$1
+    SET coderstatus=$1, printed=$2
     WHERE id = ANY($3::integer[])
   `;
 

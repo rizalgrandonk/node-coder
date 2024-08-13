@@ -6,10 +6,10 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import express from "express";
 import mainRoutes from "./routes/index";
-import SerialConnection from "./connections/serial";
-// import { insertSerialUniquecode } from "./services/codererrorlogs";
+// import SerialConnection from "./connections/serial";
 import { DatabaseThread } from "./threads/databaseThread";
 import { PrinterThread } from "./threads/printerThread";
+import path from "path";
 
 const app = express();
 const httpServer = createServer(app);
@@ -280,10 +280,10 @@ app.get("/stop-batch", async (req, res) => {
   return res.status(200).json({ message: "Success" });
 });
 
-// app.use(express.static(path.join(__dirname, "../client/dist")));
-// app.get("*", (req, res) => {
-//   res.sendFile(path.join(__dirname, "../client/dist/index.html"));
-// });
+app.use(express.static(path.join(__dirname, "../client/dist")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+});
 
 httpServer.listen(7000, () => {
   console.log(`Server running on port: 7000`);

@@ -160,4 +160,12 @@ export default class LiebingerClass {
   async enableEchoMode() {
     return this.executeCommand(`^0!EM\r\n`);
   }
+
+  async disableUserInteraction() {
+    return this.executeCommand(`^0!US\r\n`);
+  }
+
+  async enableUserInteraction() {
+    return this.executeCommand(`^0!UR\r\n`);
+  }
 }

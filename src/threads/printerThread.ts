@@ -25,27 +25,6 @@ import {
   ErrorList,
 } from "../utils/errors";
 
-/**
- * TODO
- * 0. Display Error under speed
- * 1. Insert Error printer to codererrorlog
- * 2. Insert Error connection to codererrorlog
- * 3. Insert Error open nozzle timout to codererrorlog
- * 4. Insert Error under speed
- * 5. Insert Error under limit
- *
- */
-
-/**
- * OPEN NOZZLE
- * tercepat 30 detik -> 30000 ms // 7500ms
- * terlama 33 detik -> 33000 ms // 60000
- * 16 retry attempt
- *
- * interval = tercepat / 4
- * max attempt = terlama * 2 / interval
- */
-
 // Delay Interval when opening nozzle
 const NOZZLE_OPEN_DELAY = Number(process.env.NOZZLE_OPEN_DELAY ?? 7500);
 // Maximum Nozzle Delay Attempt
@@ -55,6 +34,7 @@ const MAX_NOZZLE_OPEN_ATTEMPT = Number(
 
 // ? Configuration for printer
 const MIN_PRINT_QUEUE = Number(process.env.MIN_PRINT_QUEUE ?? 180);
+const MIN_LIMIT_PRINTQUEUE = Number(process.env.MIN_LIMIT_PRINTQUEUE ?? 60);
 const MAX_PRINTED_QUEUE = Number(process.env.MAX_PRINTED_QUEUE ?? 60);
 const MAX_QUEUE_REFILL = Number(process.env.MAX_QUEUE_REFILL ?? 30);
 
@@ -102,17 +82,6 @@ let sameMailingStatusCounter: number;
 let prevLastStartPrinNo: number = 0;
 
 let openNozzleAttempt = 0;
-
-// let isPrinterStopping: boolean = false;
-
-// let mailingCounter: number;
-// const setMailingCounter = (value: number) => {
-//   mailingCounter = value;
-//   return mailingCounter;
-// };
-// const incrementMailingCounter = () => {
-//   return setMailingCounter(mailingCounter + 1);
-// };
 
 type InitParams = {
   isPrintBuffer: SharedArrayBuffer;
@@ -196,13 +165,14 @@ const listenPrinterResponse = async () => {
     ) => {
       if (status === "close") {
         console.log("Printer Connection Closed", printedQueue.size());
-        refillDBUpdateQueue(printedQueue.size());
+        // refillDBUpdateQueue(printedQueue.size());
+        await updatePrintedQueueToUNEStatus();
 
         isPrinting.set(false);
         isPrinterFinished.set(true);
 
         clientDisplayMessage.set(CONNECTION_ERROR_LIST.CLOSED);
-        await createErrorLog(CONNECTION_ERROR_LIST.CLOSED);
+        createErrorLog(CONNECTION_ERROR_LIST.CLOSED);
 
         printer.offData(listenerHandler);
         printer.offConnectionChange(connectionChangeHandler);
@@ -210,13 +180,14 @@ const listenPrinterResponse = async () => {
         resolve();
       } else if (status === "error") {
         console.log("Printer Connection Error", err, printedQueue.size());
-        refillDBUpdateQueue(printedQueue.size());
+        // refillDBUpdateQueue(printedQueue.size());
+        await updatePrintedQueueToUNEStatus();
 
         isPrinting.set(false);
         isPrinterFinished.set(true);
 
         clientDisplayMessage.set(CONNECTION_ERROR_LIST.ERROR);
-        await createErrorLog(CONNECTION_ERROR_LIST.ERROR);
+        createErrorLog(CONNECTION_ERROR_LIST.ERROR);
 
         printer.offData(listenerHandler);
         printer.offConnectionChange(connectionChangeHandler);
@@ -224,12 +195,14 @@ const listenPrinterResponse = async () => {
         resolve();
       } else if (status === "end") {
         console.log("Printer Connection Ended", printedQueue.size());
-        refillDBUpdateQueue(printedQueue.size());
+        // refillDBUpdateQueue(printedQueue.size());
+        await updatePrintedQueueToUNEStatus();
+
         isPrinting.set(false);
         isPrinterFinished.set(true);
 
         clientDisplayMessage.set(CONNECTION_ERROR_LIST.ENDED);
-        await createErrorLog(CONNECTION_ERROR_LIST.ENDED);
+        createErrorLog(CONNECTION_ERROR_LIST.ENDED);
 
         printer.offData(listenerHandler);
         printer.offConnectionChange(connectionChangeHandler);
@@ -258,15 +231,16 @@ const listenPrinterResponse = async () => {
 
       if (!printerResponse.startsWith("^0")) {
         clientDisplayMessage.set(printerResponse);
-        await createErrorLog(printerResponse);
-        if (printedQueue.size() > 0) {
-          // Flush Printed Queue
-          const deletedQueue = printedQueue.shiftAll();
+        createErrorLog(printerResponse);
+        await updatePrintedQueueToUNEStatus();
+        // if (printedQueue.size() > 0) {
+        //   // Flush Printed Queue
+        //   const deletedQueue = printedQueue.shiftAll();
 
-          // Update uniquecode SET coderstatus = 'UNE'
-          const deletedQueueIds = deletedQueue.map((item) => item.id);
-          await setBulkUNEStatus(deletedQueueIds, new Date());
-        }
+        //   // Update uniquecode SET coderstatus = 'UNE'
+        //   const deletedQueueIds = deletedQueue.map((item) => item.id);
+        //   await setBulkUNEStatus(deletedQueueIds, new Date());
+        // }
         // TODO: Send Error Code To PLC
         // DO NOT SEND ANY COMMAND
         return;
@@ -303,7 +277,6 @@ const run = async () => {
   console.log("PRINTER THREAD RUN");
 
   // Reset Thread State
-  // isPrinterStopping = false;
   sameMailingStatusCounter = 0;
   lastMailingStatusKey = "";
 
@@ -330,7 +303,6 @@ const run = async () => {
   }
 
   // ? Reset Mailing Counter
-  // setMailingCounter(0);
 
   prevLastStartPrinNo = printCounter.get();
 
@@ -353,10 +325,12 @@ const getRefillCount = (values: {
   const { fifoEntries, maxPrintedQueueSize, lastStartedPrintNo } = values;
   const toUpdateCount = lastStartedPrintNo - prevLastStartPrinNo;
 
+  // -1 for the XXX masking entry when printer is stoping
   const actualFifoEntries = isPrinterFinished.get()
     ? fifoEntries - 1
     : fifoEntries;
 
+  // +1 for fifo que + ready to print (1) when it's not first refill
   const fifoEntriesPrinter = actualFifoEntries + (isFirstRefill ? 0 : 1);
 
   const emptySlot = maxPrintedQueueSize - fifoEntriesPrinter;
@@ -372,17 +346,11 @@ const getRefillCount = (values: {
   });
 
   if (isFirstRefill) {
-    isFirstRefill = false;
-    return emptySlot;
+    return {
+      refillCount: emptySlot,
+      emptySlot,
+    };
   }
-
-  // if (isPrinterStopping) {
-  //   return 0;
-  // }
-
-  // if (lastUpdate) {
-  //   return 0;
-  // }
 
   if (!isFirstRefill && lastStartedPrintNo > 0) {
     prevLastStartPrinNo = lastStartedPrintNo;
@@ -395,69 +363,54 @@ const getRefillCount = (values: {
     lastStartedPrintNo > 0 &&
     prevLastStartPrinNo !== lastStartedPrintNo
   ) {
-    return emptySlot;
+    // return emptySlot;
+    return {
+      refillCount: emptySlot,
+      emptySlot,
+    };
   }
 
   if (
     fifoEntriesPrinter === printedQueue.size() ||
     fifoEntriesPrinter > printedQueue.size()
   ) {
-    return 0;
+    // return 0;
+    return {
+      refillCount: 0,
+      emptySlot,
+    };
   }
-
-  if (prevLastStartPrinNo > 0 && lastStartedPrintNo > 0 && !isFirstRefill) {
-    if (
-      toUpdateCount <= 0 &&
-      printedQueue.size() - fifoEntriesPrinter > 0
-      // &&
-      // !isPrinterStopping
-    ) {
-      return printedQueue.size() - fifoEntriesPrinter;
-    }
-    console.log("toUpdateCount", toUpdateCount);
-    return Math.max(toUpdateCount, 0);
-  }
-
-  // return Math.max(printedQueue.size() - fifoEntriesPrinter, 0);
-  // return fifoEntriesPrinter === printedQueue.size() ||
-  //   fifoEntriesPrinter > printedQueue.size()
-  //   ? 0
-  //   : printedQueue.size() - fifoEntriesPrinter;
-
-  if (fifoEntriesPrinter > 0 && fifoEntriesPrinter < printedQueue.size()) {
-    return printedQueue.size() - fifoEntriesPrinter;
-  }
-
-  return 0;
 
   /**
    * Refill count based on lastStartedPrinNo when not first refill
    * Program will use this formula if previous lastStartedPrinNo > 0
    * and its not the first refill
    */
-  // if (prevLastStartPrinNo > 0 && toUpdateCount > 0 && !isFirstRefill) {
-  //   console.log("toUpdateCount", toUpdateCount);
-  //   return toUpdateCount;
-  // }
+  if (prevLastStartPrinNo > 0 && lastStartedPrintNo > 0 && !isFirstRefill) {
+    if (toUpdateCount <= 0 && printedQueue.size() - fifoEntriesPrinter > 0) {
+      return {
+        refillCount: printedQueue.size() - fifoEntriesPrinter,
+        emptySlot,
+      };
+    }
+    console.log("toUpdateCount", toUpdateCount);
+    return {
+      refillCount: Math.max(toUpdateCount, 0),
+      emptySlot,
+    };
+  }
 
-  // if (actualFifoEntries > 0 && printQueue.size() === 0 && !isFirstRefill) {
-  //   console.log(
-  //     "actualFifoEntries > 0 && printQueue.size() === 0 && !isFirstRefill",
-  //     toUpdateCount
-  //   );
-  //   return 0;
-  // }
-  /**
-   * Refill count based on maxPrintedQueueSize and fifoEntries
-   * It will prevent mismatch updated value when user manual adjust counter on device without print any code
-   */
-  // if ((actualFifoEntries > 0 || isFirstRefill) && emptySlot > 0) {
-  //   console.log("emptySlot", emptySlot);
-  //   return emptySlot;
-  // }
+  if (fifoEntriesPrinter > 0 && fifoEntriesPrinter < printedQueue.size()) {
+    return {
+      refillCount: printedQueue.size() - fifoEntriesPrinter,
+      emptySlot,
+    };
+  }
 
-  // Fallback value
-  // return 0;
+  return {
+    refillCount: 0,
+    emptySlot,
+  };
 };
 
 // Handle Printer Status Response
@@ -484,6 +437,10 @@ const handlePrinterStatus = async (printerResponse: string) => {
     if (machineState === MACHINE_STATE.READY) {
       console.log("disini stop print printer status");
       await printer.stopPrint();
+
+      // await printer.executeCommand("^0!UR\r\n");
+      await printer.enableUserInteraction();
+
       // ? Set printer stop for get refill count
       // isPrinterStopping = true;
 
@@ -519,13 +476,13 @@ const handlePrinterStatus = async (printerResponse: string) => {
     // Update Client Display Message if error is not identified
     if (identifiedErrors?.length <= 0) {
       clientDisplayMessage.set(`Unidentified Error Code: ${errorState}`);
-      await createErrorLog(`Unidentified Error Code: ${errorState}`);
+      createErrorLog(`Unidentified Error Code: ${errorState}`);
     }
 
     // Update Client Display Message if error is not skipable error
     else if (identifiedErrors?.length > 0 && !skipableError) {
       clientDisplayMessage.set(identifiedErrors[0]?.errorname);
-      await createErrorLog(identifiedErrors[0]?.errorname);
+      createErrorLog(identifiedErrors[0]?.errorname);
     }
 
     console.log("aku close error", errorState);
@@ -555,7 +512,7 @@ const handlePrinterStatus = async (printerResponse: string) => {
       // Display Error
       clientDisplayMessage.set(PRINTER_ERROR_LIST.OPEN_NOZZLE_TIMEOUT);
       // Create Error Log
-      await createErrorLog(PRINTER_ERROR_LIST.OPEN_NOZZLE_TIMEOUT);
+      createErrorLog(PRINTER_ERROR_LIST.OPEN_NOZZLE_TIMEOUT);
 
       isPrinting.set(false);
       isPrinterFinished.set(true);
@@ -580,9 +537,6 @@ const handlePrinterStatus = async (printerResponse: string) => {
     console.log({ productCounter });
     printCounter.set(productCounter);
     console.log({ productCounter }, "AFTER SET IN START PRINT");
-
-    // ? Reset Mailing Counter
-    // setMailingCounter(0);
 
     // isPrinterStopping = false;
     await printer.startPrint();
@@ -616,15 +570,16 @@ const handlePrinterStatus = async (printerResponse: string) => {
     if (!isConnectionError(clientDisplayMessage.get())) {
       if (printQueue.size() <= 0 && printedQueue.size() <= 0) {
         clientDisplayMessage.set(QUEUE_ERROR_LIST.MAILING_BUFFER_EMPTY);
-        await createErrorLog(QUEUE_ERROR_LIST.MAILING_BUFFER_EMPTY);
-      } else if (printQueue.size() < MIN_PRINT_QUEUE) {
+        createErrorLog(QUEUE_ERROR_LIST.MAILING_BUFFER_EMPTY);
+      } else if (printQueue.size() < MIN_LIMIT_PRINTQUEUE) {
         clientDisplayMessage.set(QUEUE_ERROR_LIST.UNDER_LIMIT);
-        await createErrorLog(QUEUE_ERROR_LIST.UNDER_LIMIT);
+        createErrorLog(QUEUE_ERROR_LIST.UNDER_LIMIT);
       } else {
         clientDisplayMessage.set("");
       }
     }
 
+    await printer.disableUserInteraction();
     await printer.checkMailingStatus();
     await printer.checkPrinterStatus();
   }
@@ -638,7 +593,7 @@ const handleMailingStatus = async (printerResponse: string) => {
     lastStartedPrintNoWasFinished,
   } = parseCheckMailingStatus(printerResponse);
 
-  const refillCount = getRefillCount({
+  const { refillCount, emptySlot } = getRefillCount({
     fifoEntries,
     maxPrintedQueueSize: MAX_PRINTED_QUEUE,
     lastStartedPrintNo,
@@ -665,9 +620,13 @@ const handleMailingStatus = async (printerResponse: string) => {
   });
 
   // Create error if refillCount is HIGHER  MAX_QUEUE_REFILL
-  if (refillCount > MAX_QUEUE_REFILL && !isFirstRefill && !lastUpdate) {
+  if (emptySlot > MAX_QUEUE_REFILL && !isFirstRefill && !lastUpdate) {
     clientDisplayMessage.set(QUEUE_ERROR_LIST.UNDER_SPEED);
-    await createErrorLog(QUEUE_ERROR_LIST.UNDER_SPEED);
+    createErrorLog(QUEUE_ERROR_LIST.UNDER_SPEED);
+  }
+
+  if (isFirstRefill) {
+    setFirstRefill(false);
   }
 
   // Move Queue From Printed Queue To DB Update Queue
@@ -714,12 +673,6 @@ const handleMailingStatus = async (printerResponse: string) => {
         break;
       }
       printedQueue.push(deletedPrint);
-
-      // const currentMailingCounter = incrementMailingCounter();
-      // const command = `^0=MR${currentMailingCounter}\t${deletedPrint.uniquecode}`;
-
-      // Increment Print Counter
-      // incrementPrintCounter();
 
       const currentPrintCounter = incrementPrintCounter();
       const command = `^0=MR${currentPrintCounter}\t${deletedPrint.uniquecode}`;
@@ -795,6 +748,17 @@ const createErrorLog = async (message: string) => {
     console.log("Error create error log", err);
     return null;
   });
+};
+
+const updatePrintedQueueToUNEStatus = async () => {
+  if (printedQueue.size() > 0) {
+    // Flush Printed Queue
+    const deletedQueue = printedQueue.shiftAll();
+
+    // Update uniquecode SET coderstatus = 'UNE'
+    const deletedQueueIds = deletedQueue.map((item) => item.id);
+    await setBulkUNEStatus(deletedQueueIds, new Date());
+  }
 };
 
 const incrementPrintCounter = () => {
