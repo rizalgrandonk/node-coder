@@ -12,6 +12,7 @@ export const CONNECTION_ERROR_LIST = {
 
 export const PRINTER_ERROR_LIST = {
   OPEN_NOZZLE_TIMEOUT: "OPENING NOZZLE TIMEOUT",
+  HEADCOVER_OPEN: "Warning! Headcover Open",
 } as const;
 
 export const PRINTER_MESSAGE_LIST = {

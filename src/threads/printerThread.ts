@@ -6,6 +6,7 @@ import LiebingerClass, {
   MACHINE_STATE,
   NOZZLE_STATE,
   ConnectionStatus,
+  HEADCOVER_STATE,
 } from "../actions/leibinger";
 import { setBulkUNEStatus } from "../services/uniquecodes";
 import * as ErrorCodeService from "../services/errorcode";
@@ -157,6 +158,7 @@ const waitConnectionReady = async () => {
   return printer.getConnectionStatus() === "connect";
 };
 
+// ? Function for listening printer response
 const listenPrinterResponse = async () => {
   return await new Promise<void>((resolve) => {
     const connectionChangeHandler = async (
@@ -222,6 +224,7 @@ const listenPrinterResponse = async () => {
       console.log({ printerResponse });
       // await sleep(100);
 
+      // Check if printer connection is lost
       if (printer.getConnectionStatus() !== "connect") {
         console.log("LISTENER HANDLER - Connection Lost, wait till connect");
         await waitConnectionReady();
@@ -229,18 +232,11 @@ const listenPrinterResponse = async () => {
         return;
       }
 
+      // Check if printer response is not valid
       if (!printerResponse.startsWith("^0")) {
         clientDisplayMessage.set(printerResponse);
         createErrorLog(printerResponse);
         await updatePrintedQueueToUNEStatus();
-        // if (printedQueue.size() > 0) {
-        //   // Flush Printed Queue
-        //   const deletedQueue = printedQueue.shiftAll();
-
-        //   // Update uniquecode SET coderstatus = 'UNE'
-        //   const deletedQueueIds = deletedQueue.map((item) => item.id);
-        //   await setBulkUNEStatus(deletedQueueIds, new Date());
-        // }
         // TODO: Send Error Code To PLC
         // DO NOT SEND ANY COMMAND
         return;
@@ -273,6 +269,7 @@ const listenPrinterResponse = async () => {
   });
 };
 
+// ? Function for running the printer cycle
 const run = async () => {
   console.log("PRINTER THREAD RUN");
 
@@ -294,11 +291,17 @@ const run = async () => {
   if (isFirstRun) {
     await printer.resetCounter();
     printCounter.set(0);
-  } else {
-    const productCounter = await getCounter();
-    console.log({ productCounter });
-    printCounter.set(productCounter);
 
+    console.log("AFTER START BATCH");
+  } else {
+    const printerCounter = await getCounter();
+
+    // +1 to cover unprinted masking XXX
+    const productCounter =
+      printerCounter === 0 ? printerCounter : printerCounter + 1;
+    console.log({ productCounter });
+
+    printCounter.set(productCounter);
     console.log({ productCounter }, "AFTER SET");
   }
 
@@ -400,7 +403,11 @@ const getRefillCount = (values: {
     };
   }
 
-  if (fifoEntriesPrinter > 0 && fifoEntriesPrinter < printedQueue.size()) {
+  if (
+    fifoEntriesPrinter > 0 &&
+    fifoEntriesPrinter < printedQueue.size() &&
+    !lastUpdate
+  ) {
     return {
       refillCount: printedQueue.size() - fifoEntriesPrinter,
       emptySlot,
@@ -415,7 +422,7 @@ const getRefillCount = (values: {
 
 // Handle Printer Status Response
 const handlePrinterStatus = async (printerResponse: string) => {
-  const { machineState, errorState, nozzleState } =
+  const { machineState, errorState, nozzleState, headCover } =
     parseCheckPrinterStatus(printerResponse);
 
   // console.log({
@@ -435,15 +442,8 @@ const handlePrinterStatus = async (printerResponse: string) => {
 
     // Stop Printer Status
     if (machineState === MACHINE_STATE.READY) {
-      console.log("disini stop print printer status");
       await printer.stopPrint();
-
-      // await printer.executeCommand("^0!UR\r\n");
       await printer.enableUserInteraction();
-
-      // ? Set printer stop for get refill count
-      // isPrinterStopping = true;
-
       await printer.checkPrinterStatus();
     }
 
@@ -452,8 +452,8 @@ const handlePrinterStatus = async (printerResponse: string) => {
       await printer.showDisplay();
 
       // Mask the current printer display
-      // const currentPrintCounter = incrementPrintCounter();
-      await printer.appendFifo(0, "XXXXXXXXXX");
+      const currentPrintCounter = incrementPrintCounter();
+      await printer.appendFifo(currentPrintCounter, "XXXXXXXXXX");
 
       // Set Printer Finished to Stop DatabaseThread Process
       isPrinterFinished.set(true);
@@ -465,7 +465,7 @@ const handlePrinterStatus = async (printerResponse: string) => {
 
   // Check if printer in error condition
   else if (errorState != 0) {
-    console.log("aku ada error", errorState, printerResponse);
+    console.log("RECEIVE AN ERROR STATE", errorState, printerResponse);
     const identifiedErrors = await ErrorCodeService.findByCode(
       errorState.toString()
     );
@@ -484,8 +484,6 @@ const handlePrinterStatus = async (printerResponse: string) => {
       clientDisplayMessage.set(identifiedErrors[0]?.errorname);
       createErrorLog(identifiedErrors[0]?.errorname);
     }
-
-    console.log("aku close error", errorState);
 
     setFirstRefill(true);
     await printer.closeError();
@@ -508,10 +506,10 @@ const handlePrinterStatus = async (printerResponse: string) => {
     console.log({ openNozzleAttempt });
     clientDisplayMessage.set(PRINTER_MESSAGE_LIST.OPENINNG_NOZZLE);
 
+    // Handle if nozzle not opening in few tries
     if (openNozzleAttempt >= MAX_NOZZLE_OPEN_ATTEMPT) {
-      // Display Error
+      // Set Client Display Message
       clientDisplayMessage.set(PRINTER_ERROR_LIST.OPEN_NOZZLE_TIMEOUT);
-      // Create Error Log
       createErrorLog(PRINTER_ERROR_LIST.OPEN_NOZZLE_TIMEOUT);
 
       isPrinting.set(false);
@@ -527,16 +525,16 @@ const handlePrinterStatus = async (printerResponse: string) => {
   // Start Print if nozzle is READY but printer is not READY
   else if (
     nozzleState === NOZZLE_STATE.READY &&
-    machineState != MACHINE_STATE.READY
+    machineState === MACHINE_STATE.AVAILABLE_TO_START
   ) {
     console.log("aku start print", printerResponse);
     setFirstRefill(true);
 
     // ? Reset Print Counter
-    const productCounter = await getCounter();
-    console.log({ productCounter });
-    printCounter.set(productCounter);
-    console.log({ productCounter }, "AFTER SET IN START PRINT");
+    // const productCounter = await getCounter();
+    // console.log({ productCounter });
+    // printCounter.set(productCounter);
+    // console.log({ productCounter }, "AFTER SET IN START PRINT");
 
     // isPrinterStopping = false;
     await printer.startPrint();
@@ -554,7 +552,7 @@ const handlePrinterStatus = async (printerResponse: string) => {
     await printer.enableEchoMode();
 
     console.log("AFTER RESET");
-    clientDisplayMessage.set("");
+    clientDisplayMessage.set(""); // Reset Client Display Message
 
     setFirstRun(false);
     await printer.checkPrinterStatus();
@@ -568,19 +566,39 @@ const handlePrinterStatus = async (printerResponse: string) => {
   ) {
     // Reset Display Error Message
     if (!isConnectionError(clientDisplayMessage.get())) {
+      // Check if mailing buffer is empty
       if (printQueue.size() <= 0 && printedQueue.size() <= 0) {
         clientDisplayMessage.set(QUEUE_ERROR_LIST.MAILING_BUFFER_EMPTY);
         createErrorLog(QUEUE_ERROR_LIST.MAILING_BUFFER_EMPTY);
-      } else if (printQueue.size() < MIN_LIMIT_PRINTQUEUE) {
+      }
+
+      // Check if mailing buffer is under limit
+      else if (printQueue.size() < MIN_LIMIT_PRINTQUEUE) {
         clientDisplayMessage.set(QUEUE_ERROR_LIST.UNDER_LIMIT);
         createErrorLog(QUEUE_ERROR_LIST.UNDER_LIMIT);
-      } else {
+      }
+
+      // Otherwise, reset display message
+      else {
         clientDisplayMessage.set("");
       }
     }
 
     await printer.disableUserInteraction();
     await printer.checkMailingStatus();
+    await printer.checkPrinterStatus();
+  }
+
+  // Check if machine is not available to start
+  else if (
+    machineState !== MACHINE_STATE.AVAILABLE_TO_START &&
+    machineState !== MACHINE_STATE.READY
+  ) {
+    if (headCover === HEADCOVER_STATE.OPEN) {
+      clientDisplayMessage.set(PRINTER_ERROR_LIST.HEADCOVER_OPEN);
+      createErrorLog(PRINTER_ERROR_LIST.HEADCOVER_OPEN);
+      await sleep(1000);
+    }
     await printer.checkPrinterStatus();
   }
 };
@@ -630,6 +648,7 @@ const handleMailingStatus = async (printerResponse: string) => {
     createErrorLog(QUEUE_ERROR_LIST.UNDER_SPEED);
   }
 
+  // Disable first refill
   if (isFirstRefill) {
     setFirstRefill(false);
   }
@@ -693,12 +712,13 @@ const handleMailingStatus = async (printerResponse: string) => {
 
   // Send Unique Code Command To Printer
   if (sendUniqueCodeCommand.length > 0) {
+    console.log({ sendUniqueCodeCommand });
     await printer.executeCommand(sendUniqueCodeCommand.join("\r") + "\r\n");
   }
 };
 
+// ? Function for moving Queue From Printed Queue To DB Update Queue
 const refillDBUpdateQueue = (refillCount: number) => {
-  console.log("refillDBUpdateQueue", refillCount);
   for (let i = 0; i < refillCount; i++) {
     const deletedPrinted = printedQueue.shift();
 
@@ -719,7 +739,6 @@ const getCounter = async () => {
     new Promise<string | null>((resolve) => {
       const resHandler = (printerResponseBuffer: Buffer) => {
         const printerResponse = printerResponseBuffer.toString();
-        console.log({ printerResponse });
         if (!printerResponse.includes("CC")) {
           return;
         }
@@ -746,8 +765,8 @@ const getCounter = async () => {
   return productCounter;
 };
 
+// ? Function for creating error log to database
 const createErrorLog = async (message: string) => {
-  console.log("createErrorLog", message);
   return await insertErrorLog({
     batchid: 1,
     batchno: "TEST-BATCH",
@@ -761,6 +780,7 @@ const createErrorLog = async (message: string) => {
   });
 };
 
+// ? Function for updating uniquecode in Printed Queue SET coderstatus = 'UNE'
 const updatePrintedQueueToUNEStatus = async () => {
   if (printedQueue.size() > 0) {
     // Flush Printed Queue
@@ -772,21 +792,28 @@ const updatePrintedQueueToUNEStatus = async () => {
   }
 };
 
+// ? Function for incrementing print counter
 const incrementPrintCounter = () => {
-  const currentPrintCounter = printCounter.get() + 1;
-  printCounter.set(currentPrintCounter);
+  // const currentPrintCounter = printCounter.get() + 1;
+  // printCounter.set(currentPrintCounter);
+
+  const currentPrintCounter = printCounter.get();
+  printCounter.set(currentPrintCounter + 1);
 
   return currentPrintCounter;
 };
 
+// ? Function for setting last update
 const setLastUpdate = (status: boolean) => {
   lastUpdate = status;
 };
 
+// ? Function for setting first run
 const setFirstRun = (status: boolean) => {
   isFirstRun = status;
 };
 
+// ? Function for setting first refill
 const setFirstRefill = (status: boolean) => {
   isFirstRefill = status;
 };

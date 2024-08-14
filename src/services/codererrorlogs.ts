@@ -28,7 +28,6 @@ export const insertErrorLog = async (params: CodeErrorLogType) => {
       $1, $2, $3, $4, $5, $6, $7)
   `;
 
-  console.log("insertErrorLog", { query });
   const result = await db.query(query, [
     errormessage,
     errorTimestamp,

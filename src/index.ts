@@ -256,11 +256,13 @@ app.post("/start-batch", (req, res) => {
 });
 
 app.get("/start-print", (req, res) => {
+  console.log("PRINT START INITIATED");
   startPrintProcess();
   return res.status(200).json({ message: "Success" });
 });
 
 app.get("/stop-print", async (req, res) => {
+  console.log("PRINT STOP INITIATED");
   isPrinting.set(false);
   return res.status(200).json({ message: "Success" });
 });

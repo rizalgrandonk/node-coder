@@ -128,7 +128,7 @@ describe("Printer Thread - Check Printer Status", () => {
    * Test to verify that the `startPrint` command is initiated when the nozzle is ready
    * but the printer is not yet ready.
    */
-  it("should call `startPrint` command when nozzle state is `READY` but machine state is not `READY`", async () => {
+  it("should call `startPrint` command when nozzle state is `READY` but machine state is `AVAILABLE_TO_START`", async () => {
     // Set the printer to be in printing mode
     isPrinting.set(true);
 
@@ -136,7 +136,7 @@ describe("Printer Thread - Check Printer Status", () => {
     const onData = jest.spyOn(LiebingerClass.prototype, "onData");
     printerThread.listenPrinterResponse();
     const onDataCallback = onData.mock.calls[0][0];
-    await onDataCallback(Buffer.from("^0=RS2\t4\t0\t0\t80\t0\r"));
+    await onDataCallback(Buffer.from("^0=RS2\t5\t0\t0\t80\t0\r"));
 
     // Ensure that the print command is started
     expect(LiebingerClass.prototype.startPrint).toHaveBeenCalledTimes(1);

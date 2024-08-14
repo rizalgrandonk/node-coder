@@ -36,6 +36,11 @@ export enum MACHINE_STATE {
   READY = 6,
 }
 
+export enum HEADCOVER_STATE {
+  CLOSED = 0,
+  OPEN = 1,
+}
+
 // Main class for handling Liebinger printer operations
 export default class LiebingerClass {
   private connection: SocketConnection | SerialConnection;
