@@ -338,11 +338,13 @@ const getRefillCount = (values: {
   console.log({
     fifoEntries,
     isFirstRefill,
+    lastUpdate,
     actualFifoEntries,
     fifoEntriesPrinter,
     emptySlot,
     lastStartedPrintNo,
     prevLastStartPrinNo,
+    printedQueue: printedQueue.size(),
   });
 
   if (isFirstRefill) {
@@ -356,6 +358,7 @@ const getRefillCount = (values: {
     prevLastStartPrinNo = lastStartedPrintNo;
   }
 
+  // Condition after receive an error
   if (
     printedQueue.size() <= 0 &&
     fifoEntriesPrinter <= 1 &&
@@ -363,17 +366,14 @@ const getRefillCount = (values: {
     lastStartedPrintNo > 0 &&
     prevLastStartPrinNo !== lastStartedPrintNo
   ) {
-    // return emptySlot;
+    console.log("Condition after receive an error");
     return {
       refillCount: emptySlot,
       emptySlot,
     };
   }
 
-  if (
-    fifoEntriesPrinter === printedQueue.size() ||
-    fifoEntriesPrinter > printedQueue.size()
-  ) {
+  if (fifoEntriesPrinter >= printedQueue.size() && !lastUpdate) {
     // return 0;
     return {
       refillCount: 0,
@@ -620,7 +620,12 @@ const handleMailingStatus = async (printerResponse: string) => {
   });
 
   // Create error if refillCount is HIGHER  MAX_QUEUE_REFILL
-  if (emptySlot > MAX_QUEUE_REFILL && !isFirstRefill && !lastUpdate) {
+  if (
+    emptySlot > MAX_QUEUE_REFILL &&
+    !isFirstRefill &&
+    !lastUpdate &&
+    isPrinting.get()
+  ) {
     clientDisplayMessage.set(QUEUE_ERROR_LIST.UNDER_SPEED);
     createErrorLog(QUEUE_ERROR_LIST.UNDER_SPEED);
   }
@@ -650,12 +655,18 @@ const handleMailingStatus = async (printerResponse: string) => {
     }
 
     if ((sameMailingStatusCounter >= 3 || fifoEntries <= 1) && !lastUpdate) {
-      console.log("disini stop print mailing status");
-      setLastUpdate(true);
-      await printer.stopPrint();
-      // isPrinterStopping = true;
+      console.log("disini stop print mailing status", {
+        sameMailingStatusCounter,
+        fifoEntries,
+      });
 
-      await printer.checkMailingStatus();
+      // Shutdown Printer Directly to Prevent Mailing Buffer Empty
+      if (fifoEntries <= 1) {
+        await printer.stopPrint();
+        await printer.checkMailingStatus();
+      }
+
+      setLastUpdate(true);
     }
 
     lastMailingStatusKey = currentMailingStatusKey;
