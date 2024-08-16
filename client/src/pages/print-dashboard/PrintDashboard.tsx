@@ -113,7 +113,7 @@ const PrintDashboardPage = () => {
                     })}
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 mb-3">
                   {bufferCountDisplay &&
                     bufferCountDisplay.map((item, index) => <CounterCard key={index} caption={item.caption} color={item.color} value={item.val.toString()} />)}
 

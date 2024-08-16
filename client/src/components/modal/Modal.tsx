@@ -6,17 +6,27 @@ type ModalProps = {
   title: string;
   titleStyle?: string;
   children: React.ReactNode;
-  size: string;
+  size: keyof typeof sizes;
   footer?: React.ReactNode;
 };
 
+const sizes = {
+  lg: "max-w-lg",
+  md: "max-w-md",
+  xl: "max-w-xl",
+  "2xl": "max-w-2xl",
+  "3xl": "max-w-3xl",
+  "4xl": "max-w-4xl",
+};
+
 const Modal: React.FC<ModalProps> = ({ showModal, onClose, title, children, footer, size, titleStyle }) => {
+  const sizeClass = sizes[size];
   return (
     <>
       {showModal ? (
         <>
           <div className="w-full justify-center items-center flex overflow-x-hidden overflow-y-auto fixed inset-0 z-50 outline-none focus:outline-none">
-            <div className={`relative w-full my-6 mx-auto max-w-${size}`}>
+            <div className={`relative w-full my-6 mx-auto ${sizeClass}`}>
               {/* content */}
               <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
                 {/* header */}
