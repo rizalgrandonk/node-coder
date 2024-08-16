@@ -1,7 +1,7 @@
 type CounterCardProps = {
-  color: "default" | "secondary" | "danger" | "warning" | "success";
+  color: keyof typeof colorSchema;
+  value: string;
   caption: string;
-  val: string;
 };
 
 const defaultColorSchema = {
@@ -42,14 +42,22 @@ const colorSchema = {
   success: successColorSchema,
 };
 
-export const CounterCard: React.FC<CounterCardProps> = ({ color, val, caption }) => {
-  console.log({ color, val, caption });
+const CounterCard: React.FC<CounterCardProps> = ({ color, value, caption }) => {
+  const { borderColor, backgroundColor, textColor } = colorSchema[color];
+
   return (
     <div
-      className={`col-span-1 p-3 border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 ${colorSchema[color].borderColor} ${colorSchema[color].backgroundColor}`}
+      data-testid="card-wrapper"
+      className={`flex justify-between items-center py-1 px-2.5 border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 ${borderColor} ${backgroundColor}`}
     >
-      <span className={`flex justify-start font-light text-xs ${colorSchema[color].textColor}`}>{caption}</span>
-      <div className={`flex justify-end font-bold text-lg`}>{val}</div>
+      <span data-testid="card-title" className={`font-light text-xs ${textColor}`}>
+        {caption}
+      </span>
+      <div data-testid="card-value" className="font-bold text-lg">
+        {value}
+      </div>
     </div>
   );
 };
+
+export default CounterCard;

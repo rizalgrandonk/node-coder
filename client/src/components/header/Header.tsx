@@ -1,20 +1,21 @@
+import { cn } from "@/utils/helper";
 import { useState, useEffect } from "react";
 
 const Header = () => {
   const [isFullScreen, setIsFullScreen] = useState(false);
-
+  const username = "Aken Sejati";
   // Function to check if window is in full-screen mode based on size
-  const checkFullScreen = () => {
-    const isFullscreenMode = window.innerHeight === window.screen.height;
-    setIsFullScreen(isFullscreenMode);
-  };
-
   // Use effect to set up event listeners for resize
   useEffect(() => {
-    window.addEventListener("resize", checkFullScreen);
-
+    const checkFullScreen = () => {
+      const isFullscreenMode = window.innerHeight === window.screen.height;
+      console.log(window.innerHeight, window.screen.height);
+      setIsFullScreen(isFullscreenMode);
+    };
     // Check on initial load
     checkFullScreen();
+
+    window.addEventListener("resize", checkFullScreen);
 
     return () => {
       window.removeEventListener("resize", checkFullScreen);
@@ -22,14 +23,19 @@ const Header = () => {
   }, []);
 
   return (
-    <header className={`bg-pastel-blue-100 p-4 flex justify-between items-center shadow-md transition-transform duration-300 ${isFullScreen ? "hidden" : ""}`}>
+    <header
+      data-testid="header-bar"
+      className={cn(`bg-pastel-blue-100 p-4 flex justify-between items-center shadow-md transition-transform duration-300`, isFullScreen ? "hidden" : "")}
+    >
       {/* Title */}
-      <h1 className="text-xl font-bold text-pastel-blue-700">Coder App</h1>
+      <h1 className="text-xl font-bold text-pastel-blue-700">Smile Coder</h1>
 
       {/* User Profile */}
       <div className="flex items-center space-x-4">
         <img src="https://via.placeholder.com/40" alt="User Profile" className="w-10 h-10 rounded-full border border-pastel-blue-300" />
-        <span className="text-pastel-blue-600 font-medium">Aken Sejati</span>
+        <span className="text-pastel-blue-600 font-medium" data-testid="header-username">
+          {username}
+        </span>
       </div>
     </header>
   );

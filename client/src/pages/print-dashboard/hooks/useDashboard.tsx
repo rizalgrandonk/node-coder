@@ -17,7 +17,21 @@ import { useEffect, useState } from "react";
 //   "noReadCount": 0
 // }
 
-type DashboardSocketData = {
+type BarcodeScanCountDisplay = {
+  key: "triggerCount" | "goodReadCount" | "matchCount" | "mismatchCount" | "noReadCount";
+  val: number;
+  caption: string;
+  color: "default" | "secondary" | "danger" | "warning" | "success";
+};
+
+type BufferCountDisplay = {
+  key: "printerCounter" | "estimateQuantity" | "printedQueue" | "printQueue" | "maxPrintQueue";
+  val: number;
+  caption: string;
+  color: "default" | "secondary" | "danger" | "warning" | "success";
+};
+
+export type DashboardSocketData = {
   isPrinting: boolean;
   maxPrintQueue: number;
   printQueue: number;
@@ -32,31 +46,57 @@ type DashboardSocketData = {
   noReadCount: number;
 };
 
-const bufferCountDisplay: Record<string, string> = {
-  printerCounter: "Print Counter",
-  estimateQuantity: "Target Quantity",
-  printedQueue: "Buffer Printer",
-  printQueue: "Buffer DB",
-  maxPrintQueue: "Max Buffer DB",
-};
-
+// const bufferCountDisplay: Record<string, string> = {
+//   printerCounter: "Print Counter",
+//   estimateQuantity: "Target Quantity",
+//   printedQueue: "Buffer Printer",
+//   printQueue: "Buffer DB",
+//   maxPrintQueue: "Max Buffer DB",
+// };
 const batchInfoDisplay: Partial<Record<keyof PrintData, string>> = {
   batchNo: "Batch No",
-  personel: "Personel",
+  // personel: "Personel",
   barcode: "Barcode",
-  scannedBarcode: "Scanned Barcode",
+  // scannedBarcode: "Scanned Barcode",
   productName: "Product Name",
 };
 
 const channel = "printStatus";
-type BarcodeScanCountDisplay = {
-  key: "triggerCount" | "goodReadCount" | "matchCount" | "mismatchCount" | "noReadCount";
-  val: number;
-  caption: string;
-  color: "default" | "secondary" | "danger" | "warning" | "success";
-};
+
 export const useDashboard = () => {
   const socketCtx = useSocket();
+  const [bufferCountDisplay, setBufferCountDisplay] = useState<BufferCountDisplay[]>([
+    {
+      key: "printerCounter",
+      val: 0,
+      caption: "Print Counter",
+      color: "default",
+    },
+    {
+      key: "estimateQuantity",
+      val: 0,
+      caption: "Target Quantity",
+      color: "default",
+    },
+    {
+      key: "printedQueue",
+      val: 0,
+      caption: "Buffer Printer",
+      color: "default",
+    },
+    {
+      key: "printQueue",
+      val: 0,
+      caption: "Buffer DB",
+      color: "default",
+    },
+    {
+      key: "maxPrintQueue",
+      val: 0,
+      caption: "Max Buffer DB",
+      color: "default",
+    },
+  ]);
   const [barcodeScanCountDisplay, setBarcodeScanCountDisplay] = useState<BarcodeScanCountDisplay[]>([
     {
       key: "triggerCount",
@@ -90,7 +130,41 @@ export const useDashboard = () => {
     },
   ]);
   const [socketData, setSocketData] = useState<DashboardSocketData>();
-
+  const setColorBufferCountDisplay = (data: DashboardSocketData) => {
+    const { printedCount, targetQuantity, printedQueue, printQueue, maxPrintQueue } = data;
+    setBufferCountDisplay([
+      {
+        key: "printerCounter",
+        val: printedCount,
+        caption: "Print Counter",
+        color: "default",
+      },
+      {
+        key: "estimateQuantity",
+        val: targetQuantity,
+        caption: "Target Quantity",
+        color: "default",
+      },
+      {
+        key: "printedQueue",
+        val: printedQueue,
+        caption: "Buffer Printer",
+        color: "default",
+      },
+      {
+        key: "printQueue",
+        val: printQueue,
+        caption: "Buffer DB",
+        color: "default",
+      },
+      {
+        key: "maxPrintQueue",
+        val: maxPrintQueue,
+        caption: "Max Buffer DB",
+        color: "default",
+      },
+    ]);
+  };
   const setColorBarcodeScanCountDisplay = (data: DashboardSocketData) => {
     const { triggerCount, goodReadCount, matchCount, mismatchCount, noReadCount } = data;
     const barcodeScanCountDisplayData: BarcodeScanCountDisplay[] = [
@@ -107,7 +181,7 @@ export const useDashboard = () => {
         color:
           triggerCount === 0
             ? "secondary"
-            : (triggerCount * 75) / 100 < goodReadCount
+            : (triggerCount * 75) / 100 <= goodReadCount
             ? "success"
             : (triggerCount * 75) / 100 > goodReadCount && (triggerCount * 60) / 100 <= goodReadCount
             ? "warning"
@@ -120,7 +194,7 @@ export const useDashboard = () => {
         color:
           triggerCount === 0
             ? "secondary"
-            : (triggerCount * 75) / 100 < matchCount
+            : (triggerCount * 75) / 100 <= matchCount
             ? "success"
             : (triggerCount * 75) / 100 > matchCount && (triggerCount * 60) / 100 <= matchCount
             ? "warning"
@@ -147,12 +221,18 @@ export const useDashboard = () => {
       console.log("RECEIVED PRINT STATUS SOCKET DATA", val);
       setSocketData(val);
       setColorBarcodeScanCountDisplay(val);
+      setColorBufferCountDisplay(val);
     });
     return () => {
       socketCtx.context.off(channel);
     };
   }, [socketCtx]);
 
-  useEffect(() => {});
-  return { bufferCountDisplay, barcodeScanCountDisplay, batchInfoDisplay, socketData };
+  // useEffect(() => {});
+  return {
+    bufferCountDisplay,
+    barcodeScanCountDisplay,
+    batchInfoDisplay,
+    socketData,
+  };
 };

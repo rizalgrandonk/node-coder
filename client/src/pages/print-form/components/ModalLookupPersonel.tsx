@@ -5,7 +5,7 @@ const ModalLookupPersonel = ({ showModal, setShowModal }: any) => {
     <Modal
       size="lg"
       showModal={showModal}
-      setShowModal={setShowModal}
+      onClose={() => setShowModal}
       title="SCAN PERSONEL"
       footer={
         <>
@@ -28,10 +28,7 @@ const ModalLookupPersonel = ({ showModal, setShowModal }: any) => {
     >
       <div className="my-4 min-w-48 text-blueGray-500 text-lg leading-relaxed">
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium leading-6 text-gray-900"
-          >
+          <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
             NIK
           </label>
           <div className="my-2 flex flex-row">
@@ -54,10 +51,7 @@ const ModalLookupPersonel = ({ showModal, setShowModal }: any) => {
           </button>
         </div>
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium leading-6 text-gray-900"
-          >
+          <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
             Personel
           </label>
           <div className="my-2 flex flex-row">

@@ -7,15 +7,12 @@ type ModalLookupProductProps = {
   onSubmit: (data: any) => void;
 };
 
-const ModalLookupProduct = ({
-  showModal,
-  setShowModal,
-}: ModalLookupProductProps) => {
+const ModalLookupProduct = ({ showModal, setShowModal }: ModalLookupProductProps) => {
   return (
     <Modal
       size="lg"
       showModal={showModal}
-      setShowModal={setShowModal}
+      onClose={() => setShowModal}
       title="SCAN PRODUCT"
       footer={
         <>
@@ -38,10 +35,7 @@ const ModalLookupProduct = ({
     >
       <div className="my-4 min-w-48 text-blueGray-500 text-lg leading-relaxed">
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium leading-6 text-gray-900"
-          >
+          <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
             BARCODE
           </label>
           <div className="my-2 flex flex-row">
@@ -64,10 +58,7 @@ const ModalLookupProduct = ({
           </button>
         </div>
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium leading-6 text-gray-900"
-          >
+          <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
             PRODUCT
           </label>
           <div className="my-2 flex flex-row">
