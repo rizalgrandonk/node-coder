@@ -6,7 +6,13 @@ import { useNavigate } from "react-router-dom";
 import { useDashboard } from "./hooks/useDashboard";
 import CounterCard from "./components/CounterCard";
 import PrinterMessage from "./components/PrinterMessage";
-import { PrinterIcon, Cog6ToothIcon, PlayIcon, StopCircleIcon, NoSymbolIcon } from "@heroicons/react/24/outline";
+import {
+  PrinterIcon,
+  Cog6ToothIcon,
+  PlayIcon,
+  StopCircleIcon,
+  NoSymbolIcon,
+} from "@heroicons/react/24/outline";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
 import { cn } from "@/utils/helper";
 import ErrorModal from "./components/ErrorModal";
@@ -15,7 +21,12 @@ const PrintDashboardPage = () => {
   const navigate = useNavigate();
   const socketCtx = useSocket();
   const printDataCtx = usePrintData();
-  const { barcodeScanCountDisplay, batchInfoDisplay, bufferCountDisplay, socketData } = useDashboard();
+  const {
+    barcodeScanCountDisplay,
+    batchInfoDisplay,
+    bufferCountDisplay,
+    socketData,
+  } = useDashboard();
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
 
   const [errorList, setErrorList] = useState<string[]>([]);
@@ -23,7 +34,8 @@ const PrintDashboardPage = () => {
   useEffect(() => {
     printDataCtx.updatePrintData({
       personel: "AkenSejati",
-      productName: "Pembersih Lantai SOS Apple Wonder 700 / 750 ml S.O.S Aroma Apel",
+      productName:
+        "Pembersih Lantai SOS Apple Wonder 700 / 750 ml S.O.S Aroma Apel",
       barcode: "055500130207",
       scannedBarcode: "055500130207",
       batchNo: "BATCH-055500130207-0001",
@@ -54,6 +66,7 @@ const PrintDashboardPage = () => {
   }, [socketCtx, errorList]);
 
   const onButtonStartPrintClick = () => {
+    console.log("Start Print Clicked");
     setIsPrinting(true);
     socketCtx.context.emit("startPrint");
   };
@@ -63,8 +76,8 @@ const PrintDashboardPage = () => {
     socketCtx.context.emit("stopPrint");
   };
 
-  // const connectedPrinter = ["1000012"];
-  const connectedPrinter = ["1000012", "1000013"];
+  const connectedPrinter = ["1000012"];
+  // const connectedPrinter = ["1000012", "1000013"];
   // const connectedPrinter = ["1000012", "1000013", "10000014", "1000015"];
 
   return (
@@ -72,7 +85,12 @@ const PrintDashboardPage = () => {
       <Header />
 
       <div className="min-h-screen p-3 bg-slate-200 text-gray-900">
-        <div className={cn("grid gap-3 place-items-center", connectedPrinter.length > 1 ? "xl:grid-cols-2" : "")}>
+        <div
+          className={cn(
+            "grid gap-3 place-items-center",
+            connectedPrinter.length > 1 ? "xl:grid-cols-2" : ""
+          )}
+        >
           {connectedPrinter.map((markingPrinterId, index) => (
             <div
               key={index}
@@ -92,21 +110,41 @@ const PrintDashboardPage = () => {
               </div>
 
               <div className="flex-grow pl-3">
-                <PrinterMessage message={socketData?.displayMessage ?? (isPrinting ? "success:Print Ready" : `danger:Please press "Start Print" Button`)} />
+                <PrinterMessage
+                  message={
+                    socketData?.displayMessage ??
+                    (isPrinting
+                      ? "success:Print Ready"
+                      : `danger:Please press "Start Print" Button`)
+                  }
+                />
                 <div className="grid grid-cols-2 gap-3 mb-3 p-2 border border-gray-200 rounded-lg shadow-sm">
                   {batchInfoDisplay &&
-                    (Object.keys(batchInfoDisplay) as Array<keyof PrintData>).map((key, index) => {
+                    (
+                      Object.keys(batchInfoDisplay) as Array<keyof PrintData>
+                    ).map((key, index) => {
                       return (
-                        <div key={index} className="col-span-2 lg:col-span-1 last:col-span-2 items-center my-1">
+                        <div
+                          key={index}
+                          className="col-span-2 lg:col-span-1 last:col-span-2 items-center my-1"
+                        >
                           <div className="flex flex-row items-center gap-1">
-                            <label className="min-w-32 text-sm font-medium text-gray-700">{batchInfoDisplay[key]}</label>
-                            <span className="col-span-3 text-sm font-semibold text-gray-900">: {printDataCtx.printData?.[key]}</span>
-                            {key === "barcode" && printDataCtx.printData?.scannedBarcode === printDataCtx.printData?.barcode && (
-                              <CheckCircleIcon className="size-5 text-green-500" />
-                            )}
-                            {key === "barcode" && printDataCtx.printData?.scannedBarcode !== printDataCtx.printData?.barcode && (
-                              <XCircleIcon className="size-5 text-red-500" />
-                            )}
+                            <label className="min-w-32 text-sm font-medium text-gray-700">
+                              {batchInfoDisplay[key]}
+                            </label>
+                            <span className="col-span-3 text-sm font-semibold text-gray-900">
+                              : {printDataCtx.printData?.[key]}
+                            </span>
+                            {key === "barcode" &&
+                              printDataCtx.printData?.scannedBarcode ===
+                                printDataCtx.printData?.barcode && (
+                                <CheckCircleIcon className="size-5 text-green-500" />
+                              )}
+                            {key === "barcode" &&
+                              printDataCtx.printData?.scannedBarcode !==
+                                printDataCtx.printData?.barcode && (
+                                <XCircleIcon className="size-5 text-red-500" />
+                              )}
                           </div>
                         </div>
                       );
@@ -115,11 +153,23 @@ const PrintDashboardPage = () => {
 
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 mb-3">
                   {bufferCountDisplay &&
-                    bufferCountDisplay.map((item, index) => <CounterCard key={index} caption={item.caption} color={item.color} value={item.val.toString()} />)}
+                    bufferCountDisplay.map((item, index) => (
+                      <CounterCard
+                        key={index}
+                        caption={item.caption}
+                        color={item.color}
+                        value={item.val.toString()}
+                      />
+                    ))}
 
                   {barcodeScanCountDisplay &&
                     barcodeScanCountDisplay.map((item, index) => (
-                      <CounterCard key={index} caption={item.caption} color={item.color} value={item.val.toString()} />
+                      <CounterCard
+                        key={index}
+                        caption={item.caption}
+                        color={item.color}
+                        value={item.val.toString()}
+                      />
                     ))}
                 </div>
 
@@ -172,8 +222,9 @@ const PrintDashboardPage = () => {
 
       {errorList.length > 0 && (
         <ErrorModal
+          data-testid="error-modal"
           message={errorList[0]}
-          title="Printer 1000013 Error !!!"
+          title="Printer Error !"
           onClose={() => {
             setErrorList(errorList.slice(1));
           }}

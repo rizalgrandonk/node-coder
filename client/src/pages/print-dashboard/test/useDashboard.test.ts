@@ -45,19 +45,59 @@ describe("useDashboard Hook", () => {
     const { result } = renderHook(() => useDashboard());
 
     expect(result.current.bufferCountDisplay).toEqual([
-      { key: "printerCounter", val: 0, caption: "Print Counter", color: "default" },
-      { key: "estimateQuantity", val: 0, caption: "Target Quantity", color: "default" },
-      { key: "printedQueue", val: 0, caption: "Buffer Printer", color: "default" },
+      {
+        key: "printerCounter",
+        val: 0,
+        caption: "Print Counter",
+        color: "default",
+      },
+      {
+        key: "estimateQuantity",
+        val: 0,
+        caption: "Target Quantity",
+        color: "default",
+      },
+      {
+        key: "printedQueue",
+        val: 0,
+        caption: "Buffer Printer",
+        color: "default",
+      },
       { key: "printQueue", val: 0, caption: "Buffer DB", color: "default" },
-      { key: "maxPrintQueue", val: 0, caption: "Max Buffer DB", color: "default" },
+      {
+        key: "maxPrintQueue",
+        val: 0,
+        caption: "Max Buffer DB",
+        color: "default",
+      },
     ]);
 
     expect(result.current.barcodeScanCountDisplay).toEqual([
-      { key: "triggerCount", caption: "Trigger Count", val: 0, color: "default" },
-      { key: "goodReadCount", caption: "Good Read Count", val: 0, color: "default" },
+      {
+        key: "triggerCount",
+        caption: "Trigger Count",
+        val: 0,
+        color: "default",
+      },
+      {
+        key: "goodReadCount",
+        caption: "Good Read Count",
+        val: 0,
+        color: "default",
+      },
       { key: "matchCount", caption: "Match Count", val: 0, color: "default" },
-      { key: "mismatchCount", caption: "Mismatch Count", val: 0, color: "default" },
-      { key: "noReadCount", caption: "No Read Count", val: 0, color: "default" },
+      {
+        key: "mismatchCount",
+        caption: "Mismatch Count",
+        val: 0,
+        color: "default",
+      },
+      {
+        key: "noReadCount",
+        caption: "No Read Count",
+        val: 0,
+        color: "default",
+      },
     ]);
 
     expect(result.current.socketData).toBeUndefined();
@@ -73,7 +113,10 @@ describe("useDashboard Hook", () => {
   it("should set up and tear down socket event listeners", () => {
     const { unmount } = renderHook(() => useDashboard());
 
-    expect(mockSocketContext.context.on).toHaveBeenCalledWith("printStatus", expect.any(Function));
+    expect(mockSocketContext.context.on).toHaveBeenCalledWith(
+      "printStatus",
+      expect.any(Function)
+    );
 
     unmount();
 
@@ -108,25 +151,65 @@ describe("useDashboard Hook", () => {
     });
 
     expect(result.current.bufferCountDisplay).toEqual([
-      { key: "printerCounter", val: 20, caption: "Print Counter", color: "default" },
-      { key: "estimateQuantity", val: 100, caption: "Target Quantity", color: "default" },
-      { key: "printedQueue", val: 10, caption: "Buffer Printer", color: "default" },
+      {
+        key: "printerCounter",
+        val: 20,
+        caption: "Print Counter",
+        color: "default",
+      },
+      {
+        key: "estimateQuantity",
+        val: 100,
+        caption: "Target Quantity",
+        color: "default",
+      },
+      {
+        key: "printedQueue",
+        val: 10,
+        caption: "Buffer Printer",
+        color: "default",
+      },
       { key: "printQueue", val: 5, caption: "Buffer DB", color: "default" },
-      { key: "maxPrintQueue", val: 254, caption: "Max Buffer DB", color: "default" },
+      {
+        key: "maxPrintQueue",
+        val: 254,
+        caption: "Max Buffer DB",
+        color: "default",
+      },
     ]);
 
     expect(result.current.barcodeScanCountDisplay).toEqual([
-      { key: "triggerCount", caption: "Trigger Count", val: 100, color: "default" },
-      { key: "goodReadCount", caption: "Good Read Count", val: 80, color: "success" },
+      {
+        key: "triggerCount",
+        caption: "Trigger Count",
+        val: 100,
+        color: "default",
+      },
+      {
+        key: "goodReadCount",
+        caption: "Good Read Count",
+        val: 80,
+        color: "success",
+      },
       { key: "matchCount", caption: "Match Count", val: 74, color: "warning" },
-      { key: "mismatchCount", caption: "Mismatch Count", val: 6, color: "warning" },
-      { key: "noReadCount", caption: "No Read Count", val: 10, color: "warning" },
+      {
+        key: "mismatchCount",
+        caption: "Mismatch Count",
+        val: 6,
+        color: "warning",
+      },
+      {
+        key: "noReadCount",
+        caption: "No Read Count",
+        val: 10,
+        color: "warning",
+      },
     ]);
 
     expect(result.current.socketData).toEqual(mockData);
   });
 
-  it("should update barcodeScanCountDisplay Good Read Count color to green if  Good Read Count > 75% Trigger Count", () => {
+  it("should update barcodeScanCountDisplay Good Read Count color to green if  Good Read Count >= 75% Trigger Count", () => {
     const mockData = {
       ...defaultSocketData,
       triggerCount: 100,
@@ -144,10 +227,15 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "goodReadCount", caption: "Good Read Count", val: 80, color: "success" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "goodReadCount",
+      caption: "Good Read Count",
+      val: 80,
+      color: "success",
+    });
   });
 
-  it("should update barcodeScanCountDisplay Good Read Count color to yellow if  60% Trigger Count < Good Read Count < 75% Trigger Count", () => {
+  it("should update barcodeScanCountDisplay Good Read Count color to yellow if  60% Trigger Count <= Good Read Count < 75% Trigger Count", () => {
     const mockData = {
       ...defaultSocketData,
       triggerCount: 100,
@@ -165,7 +253,12 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "goodReadCount", caption: "Good Read Count", val: 68, color: "warning" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "goodReadCount",
+      caption: "Good Read Count",
+      val: 68,
+      color: "warning",
+    });
   });
 
   it("should update barcodeScanCountDisplay Good Read Count color to red if  Good Read Count < 60% Trigger Count", () => {
@@ -186,10 +279,15 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "goodReadCount", caption: "Good Read Count", val: 52, color: "danger" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "goodReadCount",
+      caption: "Good Read Count",
+      val: 52,
+      color: "danger",
+    });
   });
 
-  it("should update barcodeScanCountDisplay Match Count color to green if  Match Count > 75% Trigger Count", () => {
+  it("should update barcodeScanCountDisplay Match Count color to green if  Match Count >= 75% Trigger Count", () => {
     const mockData = {
       ...defaultSocketData,
       triggerCount: 100,
@@ -207,10 +305,15 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "matchCount", caption: "Match Count", val: 80, color: "success" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "matchCount",
+      caption: "Match Count",
+      val: 80,
+      color: "success",
+    });
   });
 
-  it("should update barcodeScanCountDisplay Match Count color to yellow if  60% Trigger Count < Match Count < 75% Trigger Count", () => {
+  it("should update barcodeScanCountDisplay Match Count color to yellow if  60% Trigger Count <= Match Count < 75% Trigger Count", () => {
     const mockData = {
       ...defaultSocketData,
       triggerCount: 100,
@@ -228,7 +331,12 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "matchCount", caption: "Match Count", val: 68, color: "warning" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "matchCount",
+      caption: "Match Count",
+      val: 68,
+      color: "warning",
+    });
   });
 
   it("should update barcodeScanCountDisplay Match Count color to red if  Match Count < 60% Trigger Count", () => {
@@ -249,7 +357,12 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "matchCount", caption: "Match Count", val: 52, color: "danger" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "matchCount",
+      caption: "Match Count",
+      val: 52,
+      color: "danger",
+    });
   });
 
   it("should update barcodeScanCountDisplay Mismatch Count color to green if  Mismatch Count == 0", () => {
@@ -270,7 +383,12 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "mismatchCount", caption: "Mismatch Count", val: 0, color: "success" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "mismatchCount",
+      caption: "Mismatch Count",
+      val: 0,
+      color: "success",
+    });
   });
 
   it("should update barcodeScanCountDisplay Mismatch Count color to yellow if  Mismatch Count > 0", () => {
@@ -291,7 +409,12 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "mismatchCount", caption: "Mismatch Count", val: 5, color: "warning" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "mismatchCount",
+      caption: "Mismatch Count",
+      val: 5,
+      color: "warning",
+    });
   });
 
   it("should update barcodeScanCountDisplay No Read Count color to green if  No Read Count == 0", () => {
@@ -312,7 +435,12 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "noReadCount", caption: "No Read Count", val: 0, color: "success" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "noReadCount",
+      caption: "No Read Count",
+      val: 0,
+      color: "success",
+    });
   });
 
   it("should update barcodeScanCountDisplay No Read Count color to yellow if  No Read Count > 0", () => {
@@ -333,6 +461,11 @@ describe("useDashboard Hook", () => {
       socketCallback(mockData);
     });
 
-    expect(result.current.barcodeScanCountDisplay).toContainEqual({ key: "noReadCount", caption: "No Read Count", val: 5, color: "warning" });
+    expect(result.current.barcodeScanCountDisplay).toContainEqual({
+      key: "noReadCount",
+      caption: "No Read Count",
+      val: 5,
+      color: "warning",
+    });
   });
 });
