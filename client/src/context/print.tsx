@@ -1,15 +1,10 @@
-import {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
-type PrintData = {
+export type PrintData = {
   personel: string;
   productName: string;
   barcode: string;
+  scannedBarcode: string;
   batchNo: string;
   printEstimate: number;
   availableCount: number;
@@ -22,7 +17,16 @@ type PrintContextType = {
 };
 
 const PrintContext = createContext<PrintContextType>({
-  printData: undefined,
+  // printData: undefined,
+  printData: {
+    personel: "AkenSejati",
+    productName: "Pembersih Lantai SOS Apple Wonder 700 / 750 ml S.O.S Aroma Apel",
+    barcode: "055500130207",
+    scannedBarcode: "055500130207",
+    batchNo: "BATCH-055500130207-0001",
+    printEstimate: 0,
+    availableCount: 0,
+  },
   updatePrintData: () => undefined,
   clearPrintData: () => undefined,
   hasFilledForm: false,
@@ -30,9 +34,7 @@ const PrintContext = createContext<PrintContextType>({
 
 export const usePrintData = () => useContext(PrintContext);
 
-export const PrintDataProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
+export const PrintDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [printData, setPrintData] = useState<PrintData | undefined>(undefined);
 
   useEffect(() => {
@@ -55,11 +57,5 @@ export const PrintDataProvider: React.FC<{ children: ReactNode }> = ({
   };
   const hasFilledForm = !!printData;
 
-  return (
-    <PrintContext.Provider
-      value={{ printData, updatePrintData, clearPrintData, hasFilledForm }}
-    >
-      {children}
-    </PrintContext.Provider>
-  );
+  return <PrintContext.Provider value={{ printData, updatePrintData, clearPrintData, hasFilledForm }}>{children}</PrintContext.Provider>;
 };

@@ -3,9 +3,10 @@ import { useSocket } from "@/context/socket";
 
 type TestSocketValueProps = {
   channel: string;
+  textColor?: string;
 };
 
-const TextSocketValue: React.FC<TestSocketValueProps> = ({ channel }) => {
+const TextSocketValue: React.FC<TestSocketValueProps> = ({ channel, textColor }) => {
   const socketCtx = useSocket();
   const [socketData, setSocketData] = useState<number>(0);
   useEffect(() => {
@@ -17,6 +18,6 @@ const TextSocketValue: React.FC<TestSocketValueProps> = ({ channel }) => {
     };
   }, [socketCtx, channel]);
 
-  return <span className="font-bold text-gray-900">{socketData}</span>;
+  return <span className={`font-bold  ${textColor ?? "text-gray-900"}`}>{socketData}</span>;
 };
 export default TextSocketValue;

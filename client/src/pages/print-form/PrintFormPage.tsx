@@ -21,14 +21,8 @@ type PrintDataType = z.infer<typeof PrintDataSchema>;
 const PrintFormPage = () => {
   const navigate = useNavigate();
   const printDataCtx = usePrintData();
-  const {
-    showPersonelModal,
-    setShowPersonelModal,
-    lookupPersonelSubmitHandler,
-    showProductModal,
-    setShowProductModal,
-    lookupProductSubmitHandler,
-  } = usePrintFormModal();
+  const { showPersonelModal, setShowPersonelModal, lookupPersonelSubmitHandler, showProductModal, setShowProductModal, lookupProductSubmitHandler } =
+    usePrintFormModal();
 
   const {
     register,
@@ -51,6 +45,7 @@ const PrintFormPage = () => {
       personel: "Personel-001",
       printEstimate: 1000000,
       barcode: "BARCODE-001",
+      scannedBarcode: "BARCODE-001",
       productName: "Product-001",
     });
     navigate("/dashboard");
@@ -61,20 +56,12 @@ const PrintFormPage = () => {
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="w-full max-w-md p-8 bg-white border-2 border-indigo-50 rounded-lg shadow-lg">
           <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-            <h2 className="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-indigo-600">
-              Print Setup
-            </h2>
+            <h2 className="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-indigo-600">Print Setup</h2>
           </div>
 
-          <form
-            onSubmit={handleSubmit(formSubmitHandler)}
-            className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm space-y-6"
-          >
+          <form onSubmit={handleSubmit(formSubmitHandler)} className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm space-y-6">
             <div>
-              <label
-                htmlFor="personel"
-                className="block text-sm font-medium leading-6 text-gray-900"
-              >
+              <label htmlFor="personel" className="block text-sm font-medium leading-6 text-gray-900">
                 Personel
               </label>
               <div className="mt-2 flex flex-row">
@@ -91,18 +78,11 @@ const PrintFormPage = () => {
                   SCAN
                 </button>
               </div>
-              {errors.personel && (
-                <span className="text-xs text-red-500">
-                  {errors.personel.message}
-                </span>
-              )}
+              {errors.personel && <span className="text-xs text-red-500">{errors.personel.message}</span>}
             </div>
 
             <div>
-              <label
-                htmlFor="productName"
-                className="block text-sm font-medium leading-6 text-gray-900"
-              >
+              <label htmlFor="productName" className="block text-sm font-medium leading-6 text-gray-900">
                 Product
               </label>
               <div className="mt-2 flex flex-row">
@@ -119,18 +99,11 @@ const PrintFormPage = () => {
                   SCAN
                 </button>
               </div>
-              {errors.productName && (
-                <span className="text-xs text-red-500">
-                  {errors.productName.message}
-                </span>
-              )}
+              {errors.productName && <span className="text-xs text-red-500">{errors.productName.message}</span>}
             </div>
 
             <div>
-              <label
-                htmlFor="batchNo"
-                className="block text-sm font-medium leading-6 text-gray-900"
-              >
+              <label htmlFor="batchNo" className="block text-sm font-medium leading-6 text-gray-900">
                 Batch Number
               </label>
               <div className="mt-2 flex flex-row">
@@ -139,20 +112,13 @@ const PrintFormPage = () => {
                   className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                 />
               </div>
-              {errors.batchNo && (
-                <span className="text-xs text-red-500">
-                  {errors.batchNo.message}
-                </span>
-              )}
+              {errors.batchNo && <span className="text-xs text-red-500">{errors.batchNo.message}</span>}
             </div>
 
             <div>
               <div className="flex flex-row gap-2">
                 <div className="flex-1">
-                  <label
-                    htmlFor="printEstimate"
-                    className="block text-sm font-medium leading-6 text-gray-900"
-                  >
+                  <label htmlFor="printEstimate" className="block text-sm font-medium leading-6 text-gray-900">
                     Quantity
                   </label>
                   <div className="mt-2 flex flex-row gap-2">
@@ -161,17 +127,10 @@ const PrintFormPage = () => {
                       className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                     />
                   </div>
-                  {errors.printEstimate && (
-                    <span className="text-xs text-red-500">
-                      {errors.printEstimate.message}
-                    </span>
-                  )}
+                  {errors.printEstimate && <span className="text-xs text-red-500">{errors.printEstimate.message}</span>}
                 </div>
                 <div className="flex-1">
-                  <label
-                    htmlFor="availableCount"
-                    className="block text-sm font-medium leading-6 text-gray-900"
-                  >
+                  <label htmlFor="availableCount" className="block text-sm font-medium leading-6 text-gray-900">
                     Available Quantity
                   </label>
                   <div className="mt-2 flex flex-row gap-2">
@@ -181,11 +140,7 @@ const PrintFormPage = () => {
                       className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                     />
                   </div>
-                  {errors.availableCount && (
-                    <span className="text-xs text-red-500">
-                      {errors.availableCount.message}
-                    </span>
-                  )}
+                  {errors.availableCount && <span className="text-xs text-red-500">{errors.availableCount.message}</span>}
                 </div>
               </div>
             </div>
@@ -202,16 +157,8 @@ const PrintFormPage = () => {
         </div>
       </div>
 
-      <ModalLookupPersonel
-        showModal={showPersonelModal}
-        setShowModal={setShowPersonelModal}
-        onSubmit={lookupPersonelSubmitHandler}
-      />
-      <ModalLookupProduct
-        showModal={showProductModal}
-        setShowModal={setShowProductModal}
-        onSubmit={lookupProductSubmitHandler}
-      />
+      <ModalLookupPersonel showModal={showPersonelModal} setShowModal={setShowPersonelModal} onSubmit={lookupPersonelSubmitHandler} />
+      <ModalLookupProduct showModal={showProductModal} setShowModal={setShowProductModal} onSubmit={lookupProductSubmitHandler} />
     </>
   );
 };

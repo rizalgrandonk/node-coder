@@ -1,11 +1,6 @@
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
-import LoginPage from "./pages/login/LoginPage";
-import FormPage from "./pages/print-form/PrintFormPage";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+// import LoginPage from "./pages/login/LoginPage";
+// import FormPage from "./pages/print-form/PrintFormPage";
 import DashboardPage from "./pages/print-dashboard/PrintDashboard";
 import { PrintDataProvider } from "./context/print";
 
@@ -26,13 +21,13 @@ function App() {
     <PrintDataProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Navigate to="/login" />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+          {/* <Route path="/login" element={<LoginPage />} /> */}
+          {/* <Route
             path="/form"
             // element={isLoggedIn() ? <FormPage /> : <Navigate to="/login" />}
             element={<FormPage />}
-          />
+          /> */}
           <Route
             path="/dashboard"
             element={<DashboardPage />}
