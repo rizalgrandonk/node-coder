@@ -112,10 +112,12 @@ const PrintDashboardPage = () => {
               <div className="flex-grow pl-3">
                 <PrinterMessage
                   message={
-                    socketData?.displayMessage ??
-                    (isPrinting
+                    socketData?.displayMessage &&
+                    socketData?.displayMessage !== ""
+                      ? socketData?.displayMessage
+                      : isPrinting
                       ? "success:Print Ready"
-                      : `danger:Please press "Start Print" Button`)
+                      : `danger:Please press "Start Print" Button`
                   }
                 />
                 <div className="grid grid-cols-2 gap-3 mb-3 p-2 border border-gray-200 rounded-lg shadow-sm">

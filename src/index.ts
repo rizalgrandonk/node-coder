@@ -57,13 +57,21 @@ let batchInfo: {
 
 // let printProcess: Promise<void>;
 
-const startBatch = async (info: { batchNumber: string; barcode: string; estimate: number }) => {
+const startBatch = async (info: {
+  batchNumber: string;
+  barcode: string;
+  estimate: number;
+}) => {
   batchInfo = info;
 
   printedUpdateCount.set(0);
 
-  databaseThread = await spawn<DatabaseThread>(new ThreadWorker("./threads/databaseThread"));
-  printerThread = await spawn<PrinterThread>(new ThreadWorker("./threads/printerThread"));
+  databaseThread = await spawn<DatabaseThread>(
+    new ThreadWorker("./threads/databaseThread")
+  );
+  printerThread = await spawn<PrinterThread>(
+    new ThreadWorker("./threads/printerThread")
+  );
 
   await databaseThread.init({
     isPrintBuffer: isPrinting.getBuffer(),
@@ -135,18 +143,34 @@ const startPrintProcess = async () => {
     //   displayMessage: displayMessage.get(),
     // });
 
-    const productCounter = await printerThread.getCounter();
+    // const productCounter = await printerThread.getCounter();
+
+    // io.emit("printStatus", {
+    //   // isPrinting: isPrinting.get(),
+    //   printQueue: printQueue.size(),
+    //   printedQueue: printedQueue.size(),
+    //   // DBUpdateQueue: DBUpdateQueue.size(),
+    //   // printerCounter: printerCounter.get(),
+    //   // printedCount: printerCounter.get() - printedQueue.size(),
+    //   productCounter,
+    //   printedCount: printedUpdateCount.get(),
+    //   displayMessage: displayMessage.get(),
+    // });
+    const printedConter = printedUpdateCount.get();
 
     io.emit("printStatus", {
-      // isPrinting: isPrinting.get(),
+      isPrinting: isPrinting.get(),
+      maxPrintQueue: MAX_QUEUE,
       printQueue: printQueue.size(),
       printedQueue: printedQueue.size(),
-      // DBUpdateQueue: DBUpdateQueue.size(),
-      // printerCounter: printerCounter.get(),
-      // printedCount: printerCounter.get() - printedQueue.size(),
-      productCounter,
-      printedCount: printedUpdateCount.get(),
+      printedCount: printedConter,
+      targetQuantity: batchInfo ? batchInfo.estimate : 0,
       displayMessage: displayMessage.get(),
+      triggerCount: printedConter,
+      goodReadCount: printedConter,
+      matchCount: printedConter,
+      mismatchCount: 0,
+      noReadCount: 0,
     });
 
     if (!isPrinting.get()) {
@@ -228,7 +252,14 @@ app.post("/start-batch", (req, res) => {
 
   const barcode = req.body.barcode;
   const estimate = req.body.estimate;
-  if (!batchNumber || !barcode || !estimate || typeof batchNumber !== "string" || typeof barcode !== "string" || typeof estimate !== "number") {
+  if (
+    !batchNumber ||
+    !barcode ||
+    !estimate ||
+    typeof batchNumber !== "string" ||
+    typeof barcode !== "string" ||
+    typeof estimate !== "number"
+  ) {
     return res.status(400).json({
       message: "Failed",
       error: "Invalid Param(s)",
@@ -268,20 +299,6 @@ app.get("/stop-batch", async (req, res) => {
 });
 
 app.get("/test-socket", (req, res) => {
-  // const data = {
-  //   isPrinting: isPrinting.get(),
-  //   maxPrintQueue: MAX_QUEUE,
-  //   printQueue: printQueue.size(),
-  //   printedQueue: printedQueue.size(),
-  //   printedCount: printedUpdateCount.get(),
-  //   targetQuantity: batchInfo ? batchInfo.estimate : 0,
-  //   displayMessage: displayMessage.get(),
-  //   triggerCount: 10,
-  //   goodReadCount: 10,
-  //   matchCount: 10,
-  //   mismatchCount: 0,
-  //   noReadCount: 0,
-  // };
   const data = req.body;
   console.log("EMITTED", data);
   io.emit("printStatus", data);
