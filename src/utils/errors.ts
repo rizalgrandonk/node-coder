@@ -1,23 +1,23 @@
 export const QUEUE_ERROR_LIST = {
-  UNDER_SPEED: "Printer Running on Underspeed",
-  UNDER_LIMIT: "Under Limit",
-  MAILING_BUFFER_EMPTY: "MAILING BUFFER EMPTY",
+  UNDER_SPEED: "warning:Printer Running on Underspeed",
+  UNDER_LIMIT: "warning:Under Limit",
+  MAILING_BUFFER_EMPTY: "error:MAILING BUFFER EMPTY",
 } as const;
 
 export const CONNECTION_ERROR_LIST = {
-  CLOSED: "PRINTER CONNECTION CLOSED",
-  ERROR: "PRINTER CONNECTION ERROR",
-  ENDED: "PRINTER CONNECTION ENDED",
+  CLOSED: "error:PRINTER CONNECTION CLOSED",
+  ERROR: "error:PRINTER CONNECTION ERROR",
+  ENDED: "error:PRINTER CONNECTION ENDED",
 } as const;
 
 export const PRINTER_ERROR_LIST = {
-  OPEN_NOZZLE_TIMEOUT: "OPENING NOZZLE TIMEOUT",
-  HEADCOVER_OPEN: "Warning! Headcover Open",
+  OPEN_NOZZLE_TIMEOUT: "error:OPENING NOZZLE TIMEOUT",
+  HEADCOVER_OPEN: "error:Warning! Headcover Open",
 } as const;
 
 export const PRINTER_MESSAGE_LIST = {
-  STOP_PRINT: "STOP PRINTING",
-  OPENINNG_NOZZLE: "OPENING NOZZLE",
+  STOP_PRINT: "warning:STOP PRINTING",
+  OPENINNG_NOZZLE: "warning:OPENING NOZZLE",
 } as const;
 
 export type QueueErrorList =
