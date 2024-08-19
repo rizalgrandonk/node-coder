@@ -16,11 +16,13 @@ export const insertErrorLog = async (params: CodeErrorLogType) => {
     batchid = 328,
     batchno = "BATCH-1",
     sendconfirmed = new Date(),
-    errormessage,
+    errormessage: error,
     errorTimestamp,
     created = new Date(),
   } = params;
 
+  const errorSplit = error.split(":");
+  const errormessage = errorSplit.length === 0 ? errorSplit[0] : errorSplit[1];
   const query = `
     INSERT INTO codererrorlog
     (errormessage, errorTimestamp, batchno, sendconfirmed, batchid, markingprinterid, created)

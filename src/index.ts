@@ -199,6 +199,22 @@ const startPrintProcess = async () => {
       timeDiff,
     });
 
+    const printedConter = printedUpdateCount.get();
+    io.emit("printStatus", {
+      isPrinting: isPrinting.get(),
+      maxPrintQueue: MAX_QUEUE,
+      printQueue: printQueue.size(),
+      printedQueue: printedQueue.size(),
+      printedCount: printedConter,
+      targetQuantity: batchInfo ? batchInfo.estimate : 0,
+      displayMessage: displayMessage.get(),
+      triggerCount: printedConter,
+      goodReadCount: printedConter,
+      matchCount: printedConter,
+      mismatchCount: 0,
+      noReadCount: 0,
+    });
+
     // resolve();
   }
 
@@ -241,6 +257,22 @@ io.on("connection", (socket) => {
   socket.on("stopPrint", () => {
     console.log("Stop Print Called");
     isPrinting.set(false);
+  });
+
+  socket.on("stopBatch", async () => {
+    if (isPrinting.get()) {
+      console.log("Stop Batch Called");
+      return;
+    }
+
+    if (databaseThread) {
+      await Thread.terminate(databaseThread);
+    }
+    if (printerThread) {
+      await Thread.terminate(printerThread);
+    }
+
+    batchInfo = null;
   });
 });
 

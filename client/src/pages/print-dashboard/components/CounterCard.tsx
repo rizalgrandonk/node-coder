@@ -50,7 +50,7 @@ const CounterCard: React.FC<CounterCardProps> = ({ color, value, caption }) => {
       data-testid="card-wrapper"
       className={`flex justify-between items-center py-1 px-2.5 border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 ${borderColor} ${backgroundColor}`}
     >
-      <span data-testid="card-title" className={`font-light text-xs ${textColor}`}>
+      <span data-testid="card-title" className={`text-xs ${textColor}`}>
         {caption}
       </span>
       <div data-testid="card-value" className="font-bold text-lg">

@@ -91,6 +91,11 @@ describe("PrintDashboardPage", () => {
   });
 
   it("should handle Start Print button click", async () => {
+    let socketCallback: (val: DashboardSocketData) => void;
+    (mockSocketContext.context.on as Mock).mockImplementation((_, cb) => {
+      socketCallback = cb;
+    });
+
     const { getAllByRole } = render(
       <MemoryRouter>
         <PrintDashboardPage />
@@ -102,6 +107,13 @@ describe("PrintDashboardPage", () => {
     })[0];
 
     await userEvent.click(startButton);
+
+    act(() => {
+      socketCallback({
+        ...defaultSocketData,
+        isPrinting: true,
+      });
+    });
 
     expect(mockSocketContext.context.emit).toHaveBeenCalledWith("startPrint");
     expect(
@@ -112,6 +124,10 @@ describe("PrintDashboardPage", () => {
   });
 
   it("should handle Stop Print button click", async () => {
+    let socketCallback: (val: DashboardSocketData) => void;
+    (mockSocketContext.context.on as Mock).mockImplementation((_, cb) => {
+      socketCallback = cb;
+    });
     const { getAllByRole } = render(
       <MemoryRouter>
         <PrintDashboardPage />
@@ -124,11 +140,25 @@ describe("PrintDashboardPage", () => {
 
     await userEvent.click(startButton);
 
+    act(() => {
+      socketCallback({
+        ...defaultSocketData,
+        isPrinting: true,
+      });
+    });
+
     const stopButton = getAllByRole("button", {
       name: /Stop Print/i,
     })[0];
 
     await userEvent.click(stopButton);
+
+    act(() => {
+      socketCallback({
+        ...defaultSocketData,
+        isPrinting: false,
+      });
+    });
 
     expect(mockSocketContext.context.emit).toHaveBeenCalledWith("stopPrint");
     expect(
@@ -170,7 +200,7 @@ describe("PrintDashboardPage", () => {
     expect(queryByText(/Nozzle Timeout/i)).not.toBeInTheDocument();
   });
 
-  it("should navigate to /form on End Batch button click", () => {
+  it("should handle Stop Batch button click", () => {
     const { getByText } = render(
       <MemoryRouter>
         <PrintDashboardPage />
@@ -182,7 +212,7 @@ describe("PrintDashboardPage", () => {
       fireEvent.click(endBatchButton);
     });
 
-    expect(mockPrintDataContext.clearPrintData).toHaveBeenCalled();
-    expect(mockNavigate).toHaveBeenCalledWith("/form");
+    // expect(mockPrintDataContext.clearPrintData).toHaveBeenCalled();
+    expect(mockSocketContext.context.emit).toHaveBeenCalledWith("stopBatch");
   });
 });

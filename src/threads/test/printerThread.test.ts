@@ -6,10 +6,12 @@ import { sleep } from "../../utils/helper";
 import * as ErrorCodeService from "../../services/errorcode";
 import * as ErrorLogService from "../../services/codererrorlogs";
 import {
+  QUEUE_ERROR_LIST,
   CONNECTION_ERROR_LIST,
+  isConnectionError,
   PRINTER_ERROR_LIST,
   PRINTER_MESSAGE_LIST,
-  QUEUE_ERROR_LIST,
+  ErrorList,
 } from "../../utils/errors";
 
 // Mocks
@@ -93,10 +95,12 @@ describe("Printer Thread - Check Printer Status", () => {
     await onDataCallback(Buffer.from("^0=RS1\t4\t0\t0\t80\t0\r"));
 
     // Check if the message displayed to the client is "OPENING NOZZLE"
-    expect(clientDisplayMessage.get()).toBe("OPENING NOZZLE");
+    expect(clientDisplayMessage.get()).toBe(
+      PRINTER_MESSAGE_LIST.OPENINNG_NOZZLE
+    );
 
     // Ensure there is a delay while opening the nozzle and the printer status is checked
-    expect(sleep).toHaveBeenCalledWith(7500);
+    expect(sleep).toHaveBeenCalledWith(Number(process.env.NOZZLE_OPEN_DELAY));
     expect(LiebingerClass.prototype.checkPrinterStatus).toHaveBeenCalledTimes(
       1
     );
@@ -117,7 +121,9 @@ describe("Printer Thread - Check Printer Status", () => {
     await onDataCallback(Buffer.from("^0=RS1\t4\t0\t0\t80\t0\r"));
 
     // Check if the message displayed to the client is "OPENING NOZZLE"
-    expect(clientDisplayMessage.get()).toBe("OPENING NOZZLE");
+    expect(clientDisplayMessage.get()).toBe(
+      PRINTER_MESSAGE_LIST.OPENINNG_NOZZLE
+    );
     // Ensure that the printer status is checked
     expect(LiebingerClass.prototype.checkPrinterStatus).toHaveBeenCalledTimes(
       1
@@ -157,7 +163,7 @@ describe("Printer Thread - Check Printer Status", () => {
     await onDataCallback(Buffer.from("^0=RS2\t6\t1\t0\t80\t0\r"));
 
     // Check if the error message is displayed and logged correctly
-    expect(clientDisplayMessage.get()).toBe("Unidentified Error Code: 1");
+    expect(clientDisplayMessage.get()).toBe("error:Unidentified Error Code: 1");
     expect(LiebingerClass.prototype.closeError).toHaveBeenCalledTimes(1);
     expect(LiebingerClass.prototype.checkPrinterStatus).toHaveBeenCalledTimes(
       1
@@ -191,7 +197,7 @@ describe("Printer Thread - Check Printer Status", () => {
     await onDataCallback(Buffer.from("^0=RS2\t6\t1\t0\t80\t0\r"));
 
     // Check if the unskippable error message is displayed and logged correctly
-    expect(clientDisplayMessage.get()).toBe("Unskippable Error");
+    expect(clientDisplayMessage.get()).toBe("error:Unskippable Error");
     expect(LiebingerClass.prototype.closeError).toHaveBeenCalledTimes(1);
     expect(LiebingerClass.prototype.checkPrinterStatus).toHaveBeenCalledTimes(
       1
@@ -534,7 +540,7 @@ describe("Printer Thread - On Print Process", () => {
     // Verify that the executeCommand method was called with the correct parameters
     expect(LiebingerClass.prototype.executeCommand).toHaveBeenCalledWith(
       `${queueData
-        .map((code, i) => `^0=MR${i + 1}\t${code.uniquecode}`)
+        .map((code, i) => `^0=MR${i}\t${code.uniquecode}`)
         .join("\r")}\r\n`
     );
   });
@@ -545,8 +551,8 @@ describe("Printer Thread - On Print Process", () => {
    */
   it("should call append uniquecode command and send it to the printer, and move print queue data to printed queue (partial)", async () => {
     const queueData = Array.from(new Array(250), (_, index) => ({
-      id: 1000000 + index + 1,
-      uniquecode: `CODE${index + 1}`,
+      id: 1000000 + index,
+      uniquecode: `CODE${index}`,
     }));
 
     printQueue.push(...queueData);
@@ -578,7 +584,7 @@ describe("Printer Thread - On Print Process", () => {
     expect(LiebingerClass.prototype.executeCommand).toHaveBeenCalledWith(
       `${queueData
         .slice(0, 60)
-        .map((code, i) => `^0=MR${i + 1}\t${code.uniquecode}`)
+        .map((code, i) => `^0=MR${i}\t${code.uniquecode}`)
         .join("\r")}\r\n`
     );
 
@@ -601,7 +607,7 @@ describe("Printer Thread - On Print Process", () => {
     expect(LiebingerClass.prototype.executeCommand).toHaveBeenCalledWith(
       `${queueData
         .slice(60, 61)
-        .map((code, i) => `^0=MR${i + 61}\t${code.uniquecode}`)
+        .map((code, i) => `^0=MR${i + 60}\t${code.uniquecode}`)
         .join("\r")}\r\n`
     );
   });
@@ -767,7 +773,7 @@ describe("Printer Thread - On Stop Print", () => {
     await onDataCallback(Buffer.from("^0=RS2\t6\t0\t0\t80\t0\r"));
 
     // Verify that the client display message is updated to "STOP PRINTING"
-    expect(clientDisplayMessage.get()).toBe("STOP PRINTING");
+    expect(clientDisplayMessage.get()).toBe(PRINTER_MESSAGE_LIST.STOP_PRINT);
 
     // Verify that the `stopPrint` command is called once
     expect(LiebingerClass.prototype.stopPrint).toHaveBeenCalledTimes(1);
@@ -798,7 +804,7 @@ describe("Printer Thread - On Stop Print", () => {
     await onDataCallback(Buffer.from("^0=RS4\t4\t0\t0\t80\t0\r"));
 
     // Verify that the client display message is updated to "STOP PRINTING"
-    expect(clientDisplayMessage.get()).toBe("STOP PRINTING");
+    expect(clientDisplayMessage.get()).toBe(PRINTER_MESSAGE_LIST.STOP_PRINT);
 
     // Verify that the `showDisplay` command is called once
     expect(LiebingerClass.prototype.showDisplay).toHaveBeenCalledTimes(1);

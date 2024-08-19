@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSocket } from "@/context/socket";
 import { PrintData, usePrintData } from "@/context/print";
 import Header from "@/components/header/Header";
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 import { useDashboard } from "./hooks/useDashboard";
 import CounterCard from "./components/CounterCard";
 import PrinterMessage from "./components/PrinterMessage";
@@ -18,7 +18,7 @@ import { cn } from "@/utils/helper";
 import ErrorModal from "./components/ErrorModal";
 
 const PrintDashboardPage = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const socketCtx = useSocket();
   const printDataCtx = usePrintData();
   const {
@@ -26,8 +26,9 @@ const PrintDashboardPage = () => {
     batchInfoDisplay,
     bufferCountDisplay,
     socketData,
+    isPrinting,
+    setIsPrinting,
   } = useDashboard();
-  const [isPrinting, setIsPrinting] = useState<boolean>(false);
 
   const [errorList, setErrorList] = useState<string[]>([]);
 
@@ -48,6 +49,12 @@ const PrintDashboardPage = () => {
     const channel = "printStatus";
     const receiveError = (val: any) => {
       const displayMessage: string | undefined = val.displayMessage?.trim();
+      const isPrinting: boolean | undefined = val.isPrinting;
+
+      if (isPrinting !== undefined) {
+        setIsPrinting(isPrinting);
+      }
+
       if (!displayMessage || displayMessage === "") {
         return;
       }
@@ -67,15 +74,20 @@ const PrintDashboardPage = () => {
 
   const onButtonStartPrintClick = () => {
     console.log("Start Print Clicked");
-    setIsPrinting(true);
+    // setIsPrinting(true);
     socketCtx.context.emit("startPrint");
   };
 
   const onButtonStopPrintClick = () => {
-    setIsPrinting(false);
+    // setIsPrinting(false);
     socketCtx.context.emit("stopPrint");
   };
 
+  const onButtonStopBatchClick = () => {
+    // printDataCtx.clearPrintData();
+    // navigate("/form");
+    socketCtx.context.emit("stopBatch");
+  };
   const connectedPrinter = ["1000012"];
   // const connectedPrinter = ["1000012", "1000013"];
   // const connectedPrinter = ["1000012", "1000013", "10000014", "1000015"];
@@ -112,11 +124,11 @@ const PrintDashboardPage = () => {
               <div className="flex-grow pl-3">
                 <PrinterMessage
                   message={
-                    socketData?.displayMessage &&
-                    socketData?.displayMessage !== ""
-                      ? socketData?.displayMessage
-                      : isPrinting
-                      ? "success:Print Ready"
+                    isPrinting
+                      ? socketData?.displayMessage &&
+                        socketData?.displayMessage !== ""
+                        ? socketData?.displayMessage
+                        : "success:Print Ready"
                       : `danger:Please press "Start Print" Button`
                   }
                 />
@@ -198,10 +210,7 @@ const PrintDashboardPage = () => {
 
                   <button
                     disabled={isPrinting}
-                    onClick={() => {
-                      printDataCtx.clearPrintData();
-                      navigate("/form");
-                    }}
+                    onClick={onButtonStopBatchClick}
                     className="w-full sm:w-[175px] bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 flex items-center gap-2 justify-center disabled:bg-gray-300"
                   >
                     <NoSymbolIcon className="size-6" />

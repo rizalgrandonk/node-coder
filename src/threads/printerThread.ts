@@ -28,6 +28,7 @@ import {
 
 // Delay Interval when opening nozzle
 const NOZZLE_OPEN_DELAY = Number(process.env.NOZZLE_OPEN_DELAY ?? 7500);
+
 // Maximum Nozzle Delay Attempt
 const MAX_NOZZLE_OPEN_ATTEMPT = Number(
   process.env.MAX_NOZZLE_OPEN_ATTEMPT ?? 8
@@ -254,6 +255,8 @@ const listenPrinterResponse = async () => {
         if (!isPrinting.get() && isPrinterFinished.get()) {
           printer.offData(listenerHandler);
           printer.offConnectionChange(connectionChangeHandler);
+
+          // clientDisplayMessage.set("");
           resolve();
         }
       }
@@ -475,13 +478,13 @@ const handlePrinterStatus = async (printerResponse: string) => {
 
     // Update Client Display Message if error is not identified
     if (identifiedErrors?.length <= 0) {
-      clientDisplayMessage.set(`Unidentified Error Code: ${errorState}`);
+      clientDisplayMessage.set(`error:Unidentified Error Code: ${errorState}`);
       createErrorLog(`Unidentified Error Code: ${errorState}`);
     }
 
     // Update Client Display Message if error is not skipable error
     else if (identifiedErrors?.length > 0 && !skipableError) {
-      clientDisplayMessage.set(identifiedErrors[0]?.errorname);
+      clientDisplayMessage.set(`error:${identifiedErrors[0]?.errorname}`);
       createErrorLog(identifiedErrors[0]?.errorname);
     }
 
