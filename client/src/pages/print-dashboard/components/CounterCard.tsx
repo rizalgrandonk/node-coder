@@ -42,6 +42,14 @@ const colorSchema = {
   success: successColorSchema,
 };
 
+/**
+ * A CounterCard component that displays a caption and a value with a specific color scheme.
+ *
+ * @param {keyof typeof colorSchema} color - The color scheme to use for the card.
+ * @param {string} value - The value to display on the card.
+ * @param {string} caption - The caption to display on the card.
+ * @return {JSX.Element} The CounterCard component.
+ */
 const CounterCard: React.FC<CounterCardProps> = ({ color, value, caption }) => {
   const { borderColor, backgroundColor, textColor } = colorSchema[color];
 

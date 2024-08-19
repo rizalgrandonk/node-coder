@@ -72,6 +72,10 @@ describe("PrintDashboardPage", () => {
     vi.clearAllMocks();
   });
 
+  /**
+   * Test case to verify that the `updatePrintData` method is called
+   * with the correct data on initial render.
+   */
   it("should update print data on initial render", () => {
     render(
       <MemoryRouter>
@@ -80,16 +84,25 @@ describe("PrintDashboardPage", () => {
     );
     expect(mockPrintDataContext.updatePrintData).toHaveBeenCalledWith({
       personel: "AkenSejati",
-      productName:
-        "Pembersih Lantai SOS Apple Wonder 700 / 750 ml S.O.S Aroma Apel",
+      productName: "Pembersih Lantai SOS Apple Wonder 700 / 750 ml S.O.S Aroma Apel",
       barcode: "055500130207",
       scannedBarcode: "055500130207",
       batchNo: "BATCH-055500130207-0001",
       printEstimate: 0,
       availableCount: 0,
     });
+    /**
+     * This test case verifies that the `updatePrintData` method is called
+     * with the correct data on initial render. The `updatePrintData` method
+     * is used to update the print data in the context.
+     */
   });
 
+  /**
+   * Test case to verify that the Start Print button click is handled correctly.
+   * The button click should emit the "startPrint" event and update the
+   * display message.
+   */
   it("should handle Start Print button click", async () => {
     let socketCallback: (val: DashboardSocketData) => void;
     (mockSocketContext.context.on as Mock).mockImplementation((_, cb) => {
@@ -123,6 +136,11 @@ describe("PrintDashboardPage", () => {
     ).toBeInTheDocument();
   });
 
+  /**
+   * Test case to verify that the Stop Print button click is handled correctly.
+   * The button click should emit the "stopPrint" event and update the
+   * display message.
+   */
   it("should handle Stop Print button click", async () => {
     let socketCallback: (val: DashboardSocketData) => void;
     (mockSocketContext.context.on as Mock).mockImplementation((_, cb) => {
@@ -168,6 +186,10 @@ describe("PrintDashboardPage", () => {
     ).toBeInTheDocument();
   });
 
+  /**
+   * Test case to verify that the error modal is displayed when the errorList
+   * is not empty and can be closed.
+   */
   it("should show error modal when errorList is not empty and can close error", async () => {
     const mockData = {
       ...defaultSocketData,
@@ -200,6 +222,10 @@ describe("PrintDashboardPage", () => {
     expect(queryByText(/Nozzle Timeout/i)).not.toBeInTheDocument();
   });
 
+  /**
+   * Test case to verify that the Stop Batch button click is handled correctly.
+   * The button click should emit the "stopBatch" event.
+   */
   it("should handle Stop Batch button click", () => {
     const { getByText } = render(
       <MemoryRouter>

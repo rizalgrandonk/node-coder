@@ -6,13 +6,7 @@ import Header from "@/components/header/Header";
 import { useDashboard } from "./hooks/useDashboard";
 import CounterCard from "./components/CounterCard";
 import PrinterMessage from "./components/PrinterMessage";
-import {
-  PrinterIcon,
-  Cog6ToothIcon,
-  PlayIcon,
-  StopCircleIcon,
-  NoSymbolIcon,
-} from "@heroicons/react/24/outline";
+import { PrinterIcon, Cog6ToothIcon, PlayIcon, StopCircleIcon, NoSymbolIcon } from "@heroicons/react/24/outline";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
 import { cn } from "@/utils/helper";
 import ErrorModal from "./components/ErrorModal";
@@ -21,22 +15,14 @@ const PrintDashboardPage = () => {
   // const navigate = useNavigate();
   const socketCtx = useSocket();
   const printDataCtx = usePrintData();
-  const {
-    barcodeScanCountDisplay,
-    batchInfoDisplay,
-    bufferCountDisplay,
-    socketData,
-    isPrinting,
-    setIsPrinting,
-  } = useDashboard();
+  const { barcodeScanCountDisplay, batchInfoDisplay, bufferCountDisplay, socketData, isPrinting, setIsPrinting } = useDashboard();
 
   const [errorList, setErrorList] = useState<string[]>([]);
 
   useEffect(() => {
     printDataCtx.updatePrintData({
       personel: "AkenSejati",
-      productName:
-        "Pembersih Lantai SOS Apple Wonder 700 / 750 ml S.O.S Aroma Apel",
+      productName: "Pembersih Lantai SOS Apple Wonder 700 / 750 ml S.O.S Aroma Apel",
       barcode: "055500130207",
       scannedBarcode: "055500130207",
       batchNo: "BATCH-055500130207-0001",
@@ -97,17 +83,14 @@ const PrintDashboardPage = () => {
       <Header />
 
       <div className="min-h-screen p-3 bg-slate-200 text-gray-900">
-        <div
-          className={cn(
-            "grid gap-3 place-items-center",
-            connectedPrinter.length > 1 ? "xl:grid-cols-2" : ""
-          )}
-        >
+        <div className={cn("grid gap-3 place-items-center", connectedPrinter.length > 1 ? "xl:grid-cols-2" : "")}>
           {connectedPrinter.map((markingPrinterId, index) => (
+            // Render Printer Card
             <div
               key={index}
               className="flex flex-row w-full max-w-5xl p-3 bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 divide-x"
             >
+              {/* Render Printer Info */}
               <div className="flex flex-col items-center gap-3 pr-2">
                 <PrinterIcon className="size-6" />
                 <span
@@ -121,72 +104,51 @@ const PrintDashboardPage = () => {
                 </span>
               </div>
 
+              {/* Render Printer Message */}
               <div className="flex-grow pl-3">
                 <PrinterMessage
                   message={
                     isPrinting
-                      ? socketData?.displayMessage &&
-                        socketData?.displayMessage !== ""
+                      ? socketData?.displayMessage && socketData?.displayMessage !== ""
                         ? socketData?.displayMessage
                         : "success:Print Ready"
                       : `danger:Please press "Start Print" Button`
                   }
                 />
+
+                {/* Render Batch Info */}
                 <div className="grid grid-cols-2 gap-3 mb-3 p-2 border border-gray-200 rounded-lg shadow-sm">
                   {batchInfoDisplay &&
-                    (
-                      Object.keys(batchInfoDisplay) as Array<keyof PrintData>
-                    ).map((key, index) => {
+                    (Object.keys(batchInfoDisplay) as Array<keyof PrintData>).map((key, index) => {
                       return (
-                        <div
-                          key={index}
-                          className="col-span-2 lg:col-span-1 last:col-span-2 items-center my-1"
-                        >
+                        <div key={index} className="col-span-2 lg:col-span-1 last:col-span-2 items-center my-1">
                           <div className="flex flex-row items-center gap-1">
-                            <label className="min-w-32 text-sm font-medium text-gray-700">
-                              {batchInfoDisplay[key]}
-                            </label>
-                            <span className="col-span-3 text-sm font-semibold text-gray-900">
-                              : {printDataCtx.printData?.[key]}
-                            </span>
-                            {key === "barcode" &&
-                              printDataCtx.printData?.scannedBarcode ===
-                                printDataCtx.printData?.barcode && (
-                                <CheckCircleIcon className="size-5 text-green-500" />
-                              )}
-                            {key === "barcode" &&
-                              printDataCtx.printData?.scannedBarcode !==
-                                printDataCtx.printData?.barcode && (
-                                <XCircleIcon className="size-5 text-red-500" />
-                              )}
+                            <label className="min-w-32 text-sm font-medium text-gray-700">{batchInfoDisplay[key]}</label>
+                            <span className="col-span-3 text-sm font-semibold text-gray-900">: {printDataCtx.printData?.[key]}</span>
+                            {key === "barcode" && printDataCtx.printData?.scannedBarcode === printDataCtx.printData?.barcode && (
+                              <CheckCircleIcon className="size-5 text-green-500" />
+                            )}
+                            {key === "barcode" && printDataCtx.printData?.scannedBarcode !== printDataCtx.printData?.barcode && (
+                              <XCircleIcon className="size-5 text-red-500" />
+                            )}
                           </div>
                         </div>
                       );
                     })}
                 </div>
 
+                {/* Render Buffer and Barcode Scan Count */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 mb-3">
                   {bufferCountDisplay &&
-                    bufferCountDisplay.map((item, index) => (
-                      <CounterCard
-                        key={index}
-                        caption={item.caption}
-                        color={item.color}
-                        value={item.val.toString()}
-                      />
-                    ))}
+                    bufferCountDisplay.map((item, index) => <CounterCard key={index} caption={item.caption} color={item.color} value={item.val.toString()} />)}
 
                   {barcodeScanCountDisplay &&
                     barcodeScanCountDisplay.map((item, index) => (
-                      <CounterCard
-                        key={index}
-                        caption={item.caption}
-                        color={item.color}
-                        value={item.val.toString()}
-                      />
+                      <CounterCard key={index} caption={item.caption} color={item.color} value={item.val.toString()} />
                     ))}
                 </div>
 
+                {/* Render Start Print and Stop Print Button */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
                   {!isPrinting && (
                     <button

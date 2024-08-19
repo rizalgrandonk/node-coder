@@ -5,6 +5,15 @@ type ErrorModalProps = {
   onClose: () => void;
 };
 
+/**
+ * A modal component to display error messages.
+ *
+ * @param {ErrorModalProps} props - The properties for the error modal.
+ * @param {string} props.message - The error message to display.
+ * @param {string} props.title - The title of the error modal.
+ * @param {function} props.onClose - The function to call when the modal is closed.
+ * @return {JSX.Element|null} The error modal component or null if no message is provided.
+ */
 const ErrorModal = ({ message, title, onClose }: ErrorModalProps) => {
   if (!message) return null;
   return (
@@ -14,6 +23,12 @@ const ErrorModal = ({ message, title, onClose }: ErrorModalProps) => {
   );
 };
 
+/**
+ * A React functional component that renders a footer with a close button.
+ *
+ * @param {function} onClose - A callback function to be executed when the close button is clicked.
+ * @return {JSX.Element} A JSX element representing the footer with a close button.
+ */
 const Footer: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   return (
     <div className="flex items-center justify-end p-3 border-t border-solid border-slate-200 rounded-b">

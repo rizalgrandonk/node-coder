@@ -1,6 +1,12 @@
 type PrinterMessageProps = {
   message: string;
 };
+/**
+ * A React functional component that displays a printer message with a specific type (success, warning, or error) and a corresponding message.
+ *
+ * @param {string} message - A string containing the type and message separated by a colon (:)
+ * @return {JSX.Element} A JSX element representing the printer message
+ */
 const PrinterMessage: React.FC<PrinterMessageProps> = ({ message }) => {
   const splitMessage = message.split(":");
   const type = splitMessage[0];
