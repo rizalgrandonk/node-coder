@@ -29,6 +29,31 @@ const mockedResetBulkBuffered = resetBulkBuffered as jest.MockedFunction<
   typeof resetBulkBuffered
 >;
 
+const mockBatch = {
+  id: 2049,
+  created: new Date("2024-08-20T09:26:13.419Z"),
+  sent: null,
+  sendconfirmed: null,
+  description: null,
+  blockcodecount: 0,
+  qty: 100000,
+  endqueue: 10,
+  printedqty: 0,
+  batchno: "TEST2008241625",
+  printerlineid: 0,
+  createdby: 1000000,
+  updated: new Date("2024-08-20T09:26:13.419Z"),
+  updatedby: 1000000,
+  productid: 1000371,
+  isactive: true,
+  nik: null,
+  triggercount: null,
+  goodreadcount: null,
+  noreadcount: null,
+  matchcount: null,
+  mismatchcount: null,
+};
+
 describe("DatabaseThread", () => {
   // Declare variables for the DatabaseThread and shared data structures
   let databaseThread: DatabaseThread;
@@ -71,6 +96,7 @@ describe("DatabaseThread", () => {
       printedBuffer: printedQueue.getBuffer(),
       DBUpdateBuffer: DBUpdateQueue.getBuffer(),
       displayMessageBuffer: displayMessage.getBuffer(),
+      batchInfo: mockBatch,
     });
   });
 
@@ -164,7 +190,7 @@ describe("DatabaseThread", () => {
 
     // Mock fetching new unique codes from the database
     mockedGetUniquecodes.mockResolvedValue([
-      { id: 1111000, uniquecode: "NEW_CODE" },
+      { id: 1111000, uniquecode: "NEW_CODE" } as any,
     ]);
 
     expect(printQueue.size()).toBe(rawQueueData.length); // Check initial printQueue size

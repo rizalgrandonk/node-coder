@@ -23,6 +23,31 @@ jest.mock("threads", () => ({
 }));
 jest.mock("../../utils/helper");
 
+const mockBatch = {
+  id: 2049,
+  created: new Date("2024-08-20T09:26:13.419Z"),
+  sent: null,
+  sendconfirmed: null,
+  description: null,
+  blockcodecount: 0,
+  qty: 100000,
+  endqueue: 10,
+  printedqty: 0,
+  batchno: "TEST2008241625",
+  printerlineid: 0,
+  createdby: 1000000,
+  updated: new Date("2024-08-20T09:26:13.419Z"),
+  updatedby: 1000000,
+  productid: 1000371,
+  isactive: true,
+  nik: null,
+  triggercount: null,
+  goodreadcount: null,
+  noreadcount: null,
+  matchcount: null,
+  mismatchcount: null,
+};
+
 // Init shared variables
 let printerThread: PrinterThread;
 let isPrinting: SharedPrimitive<boolean>;
@@ -66,6 +91,7 @@ const setupPrinterThread = () => {
     printedBuffer: printedQueue.getBuffer(),
     DBUpdateBuffer: DBUpdateQueue.getBuffer(),
     displayMessageBuffer: clientDisplayMessage.getBuffer(),
+    batchInfo: mockBatch,
   });
 };
 

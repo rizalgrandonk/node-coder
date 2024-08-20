@@ -1,166 +1,274 @@
 // import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePrintData } from "@/context/print";
-import { SubmitHandler, useForm } from "react-hook-form";
+import { SubmitHandler, useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import ModalLookupPersonel from "./components/ModalLookupPersonel";
 import ModalLookupProduct from "./components/ModalLookupProduct";
 import { usePrintFormModal } from "./hooks/usePrintFormModal";
+import InputGroup from "@/components/input/InputGroup";
+import Header from "@/components/header/Header";
+import { PrinterIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
+import { startBatch } from "@/services/batchService";
+import { sleep } from "@/utils/helper";
+
+const connectedPrinter = [1000012];
+// const connectedPrinter = [1000012, 1000013];
+// const connectedPrinter = [1000012, 1000013, 10000014];
+// const connectedPrinter = [1000012, 1000013, 10000014, 1000015];
 
 const PrintDataSchema = z.object({
-  availableCount: z.number().gte(1),
-  batchNo: z.string().min(1),
-  personel: z.string().min(1),
-  printEstimate: z.number().gte(1),
-  barcode: z.string().min(1).default("default barcode"),
-  productName: z.string().min(1),
+  batchs: z.array(
+    z.object({
+      availableCount: z.number(),
+      batchNo: z
+        .string()
+        .min(1)
+        .max(255)
+        .regex(/^[A-Z0-9\-\/]+$/, {
+          message:
+            "Only uppercase alphanumeric characters, dashes, and slashes are allowed.",
+        }),
+      printEstimate: z.number().gte(1),
+      barcode: z.string().min(1),
+      productName: z.string().min(1),
+      productId: z.number().gte(1),
+    })
+  ),
 });
+
 type PrintDataType = z.infer<typeof PrintDataSchema>;
 
 const PrintFormPage = () => {
   const navigate = useNavigate();
   const printDataCtx = usePrintData();
-  const { showPersonelModal, setShowPersonelModal, lookupPersonelSubmitHandler, showProductModal, setShowProductModal, lookupProductSubmitHandler } =
+  const { showProductModal, setShowProductModal, getProductByBarcode } =
     usePrintFormModal();
+
+  const [availableQuantity, setAvailableQuantity] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    control,
+    setValue,
+    clearErrors,
   } = useForm<PrintDataType>({
     resolver: zodResolver(PrintDataSchema),
     mode: "all",
     defaultValues: {
-      availableCount: 100000,
+      batchs: connectedPrinter.map(() => ({
+        batchNo: "",
+        productName: "",
+        availableCount: 0,
+        // productId: 0,
+        // printEstimate: 0,
+        // barcode: "",
+      })),
     },
   });
 
-  const formSubmitHandler: SubmitHandler<PrintDataType> = (_) => {
-    console.log("Form Submit Handler", _);
-    // TODO: Get data from form
-    printDataCtx.updatePrintData({
-      availableCount: 0,
-      batchNo: "BATCH-001",
-      personel: "Personel-001",
-      printEstimate: 1000000,
-      barcode: "BARCODE-001",
-      scannedBarcode: "BARCODE-001",
-      productName: "Product-001",
-    });
-    navigate("/dashboard");
+  const { fields } = useFieldArray({
+    control,
+    name: "batchs",
+  });
+
+  console.log("errors", errors.batchs);
+  const formSubmitHandler: SubmitHandler<PrintDataType> = async (formData) => {
+    setIsLoading(true);
+    console.log("Form Submit Handler", formData);
+
+    const batchs = formData.batchs.map((item, index) => ({
+      batchNo: item.batchNo,
+      barcode: item.barcode,
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.printEstimate,
+      printerLineId: 1,
+      markingPrinterId: connectedPrinter[index],
+    }));
+
+    // Update Print Data Context
+    printDataCtx.updatePrintData(batchs);
+
+    // Send Create Batch Request To Server
+    const createdBatchRequest = {
+      batchs: formData.batchs.map((item) => ({
+        batchNo: item.batchNo,
+        barcode: item.barcode,
+        printEstimate: item.printEstimate,
+        productId: item.productId,
+      })),
+    };
+    const createdBatch = await startBatch(createdBatchRequest);
+    if (createdBatch.success) {
+      navigate("/dashboard");
+    } else {
+    }
+    setIsLoading(false);
+  };
+
+  const getProduct = async (index: number) => {
+    setIsLoading(true);
+
+    // ! FOR TESTING
+    await sleep(1000);
+
+    const product = await getProductByBarcode("BARCODE-001");
+    if (product && product.upc) {
+      clearErrors(`batchs.${index}.productName`);
+      setValue(`batchs.${index}.productName`, product.name);
+
+      setValue(`batchs.${index}.productId`, product.id);
+      setValue(`batchs.${index}.barcode`, product.upc);
+      // setValue("productName", product.name);
+    }
+    setIsLoading(false);
+  };
+  const getAvailableQuantity = async () => {
+    setIsLoading(true);
+
+    // ! FOR TESTING
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const availableQuantity = await Promise.resolve(1000);
+    setAvailableQuantity(availableQuantity);
+    // clearErrors(`batchs.${index}.availableCount`);
+    // setValue(`batchs.${index}.availableCount`, availableQuantity);
+    // setValue("availableCount", availableQuantity);
+    setIsLoading(false);
   };
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-white">
-        <div className="w-full max-w-md p-8 bg-white border-2 border-indigo-50 rounded-lg shadow-lg">
-          <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-            <h2 className="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-indigo-600">Print Setup</h2>
+      {isLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+          <div className="flex items-center gap-3 bg-white p-3 rounded">
+            <ArrowPathIcon className="size-6 animate-spin" />
+            Loading...
+          </div>
+        </div>
+      )}
+      <Header />
+      <div className="min-h-screen p-3 bg-slate-200 text-gray-900">
+        <form
+          onSubmit={handleSubmit(formSubmitHandler)}
+          className="bg-white space-y-4 flex flex-col gap-4 p-4 rounded-lg shadow-md "
+        >
+          <div className="flex">
+            <h1 className="text-3xl font-bold">Batch Form</h1>
           </div>
 
-          <form onSubmit={handleSubmit(formSubmitHandler)} className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm space-y-6">
-            <div>
-              <label htmlFor="personel" className="block text-sm font-medium leading-6 text-gray-900">
-                Personel
-              </label>
-              <div className="mt-2 flex flex-row">
-                <input
-                  {...register("personel")}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                />
-                {/* Button Lookup */}
-                <button
-                  type="button"
-                  className="ml-2 rounded-md border border-gray-300 bg-white py-1.5 px-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                  onClick={() => setShowPersonelModal(true)}
-                >
-                  SCAN
-                </button>
-              </div>
-              {errors.personel && <span className="text-xs text-red-500">{errors.personel.message}</span>}
-            </div>
-
-            <div>
-              <label htmlFor="productName" className="block text-sm font-medium leading-6 text-gray-900">
-                Product
-              </label>
-              <div className="mt-2 flex flex-row">
-                <input
-                  {...register("productName")}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                />
-                {/* Button Lookup */}
-                <button
-                  type="button"
-                  className="ml-2 rounded-md border border-gray-300 bg-white py-1.5 px-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                  onClick={() => setShowProductModal(true)}
-                >
-                  SCAN
-                </button>
-              </div>
-              {errors.productName && <span className="text-xs text-red-500">{errors.productName.message}</span>}
-            </div>
-
-            <div>
-              <label htmlFor="batchNo" className="block text-sm font-medium leading-6 text-gray-900">
-                Batch Number
-              </label>
-              <div className="mt-2 flex flex-row">
-                <input
-                  {...register("batchNo")}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                />
-              </div>
-              {errors.batchNo && <span className="text-xs text-red-500">{errors.batchNo.message}</span>}
-            </div>
-
-            <div>
-              <div className="flex flex-row gap-2">
-                <div className="flex-1">
-                  <label htmlFor="printEstimate" className="block text-sm font-medium leading-6 text-gray-900">
-                    Quantity
-                  </label>
-                  <div className="mt-2 flex flex-row gap-2">
-                    <input
-                      {...register("printEstimate", { valueAsNumber: true })}
-                      className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                    />
-                  </div>
-                  {errors.printEstimate && <span className="text-xs text-red-500">{errors.printEstimate.message}</span>}
-                </div>
-                <div className="flex-1">
-                  <label htmlFor="availableCount" className="block text-sm font-medium leading-6 text-gray-900">
-                    Available Quantity
-                  </label>
-                  <div className="mt-2 flex flex-row gap-2">
-                    <input
-                      {...register("availableCount", { valueAsNumber: true })}
-                      disabled
-                      className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                    />
-                  </div>
-                  {errors.availableCount && <span className="text-xs text-red-500">{errors.availableCount.message}</span>}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          <div className="flex flex-col max-w-sm">
+            <InputGroup
+              label="Available Quantity"
+              id="availableUniquecodeCount"
+              type="text"
+              value={availableQuantity}
+              readOnly
+              buttonClick={() => getAvailableQuantity()}
+              buttonIcon={<ArrowPathIcon className="size-6" />}
+            />
+          </div>
+          <div
+            className={`grid grid-cols-1 ${
+              fields.length >= 2 ? "lg:grid-cols-2" : ""
+            } gap-8`}
+          >
+            {fields.map((item, index) => (
+              <div
+                key={item.id}
+                className="w-full bg-white flex border-2 border-gray-100 rounded-lg py-2 divide-x shadow"
               >
-                Start Printing
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+                <div className="flex flex-col items-center gap-3 px-3 py-1">
+                  <PrinterIcon className="size-6" />
+                  <span
+                    style={{
+                      writingMode: "vertical-rl",
+                      textOrientation: "upright",
+                    }}
+                    className="tracking-tighter leading-none"
+                  >
+                    1-{connectedPrinter[index]}
+                  </span>
+                </div>
 
-      <ModalLookupPersonel showModal={showPersonelModal} setShowModal={setShowPersonelModal} onSubmit={lookupPersonelSubmitHandler} />
-      <ModalLookupProduct showModal={showProductModal} setShowModal={setShowProductModal} onSubmit={lookupProductSubmitHandler} />
+                <div
+                  key={item.id}
+                  className="flex-grow space-y-6 px-12 py-4 gap-4 m-auto"
+                >
+                  <InputGroup
+                    register={register(`batchs.${index}.batchNo`)}
+                    label="Batch Number"
+                    id={`batchNo-${index}`}
+                    type="text"
+                    errorMessage={errors?.batchs?.[index]?.batchNo?.message}
+                    onChange={(e) =>
+                      setValue(
+                        `batchs.${index}.batchNo`,
+                        e.target.value.toUpperCase()
+                      )
+                    }
+                  />
+
+                  <InputGroup
+                    register={register(`batchs.${index}.productName`)}
+                    label="Product"
+                    id={`productName-${index}`}
+                    type="text"
+                    readOnly
+                    errorMessage={errors?.batchs?.[index]?.productName?.message}
+                    buttonClick={() => getProduct(index)}
+                    buttonText="SCAN"
+                  />
+
+                  {/* <InputGroup
+                    register={register(`batchs.${index}.availableCount`, {
+                      valueAsNumber: true,
+                    })}
+                    label="Available Quantity"
+                    id="availableCount"
+                    type="text"
+                    readOnly
+                    errorMessage={
+                      errors?.batchs?.[index]?.availableCount?.message
+                    }
+                    buttonClick={() => getAvailableQuantity(index)}
+                  /> */}
+
+                  <InputGroup
+                    register={register(`batchs.${index}.printEstimate`, {
+                      valueAsNumber: true,
+                    })}
+                    label="Estimate Quantity"
+                    id={`printEstimate-${index}`}
+                    type="text"
+                    errorMessage={
+                      errors?.batchs?.[index]?.printEstimate?.message
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            data-testid="startBatch-button"
+            type="submit"
+            className="w-full max-w-md self-center flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          >
+            Start Batch
+          </button>
+        </form>
+      </div>
+      <ModalLookupProduct
+        showModal={showProductModal}
+        setShowModal={setShowProductModal}
+        onSubmit={() => setShowProductModal(false)}
+      />
     </>
   );
 };
-
 export default PrintFormPage;

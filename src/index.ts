@@ -4,12 +4,21 @@ import { spawn, Worker as ThreadWorker, Thread } from "threads";
 import { SharedPrimitive, SharedQueue } from "./utils/sharedBuffer";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import express from "express";
+import express, { Request as ExpressRequest } from "express";
 import mainRoutes from "./routes/index";
 // import SerialConnection from "./connections/serial";
 import { DatabaseThread } from "./threads/databaseThread";
 import { PrinterThread } from "./threads/printerThread";
+import * as ActionBatch from "./actions/batch";
 import path from "path";
+import { Batch } from "./types/data";
+import { z } from "zod";
+import { zodErrorMap } from "./utils/zod";
+import cors from "cors";
+import { parseIP } from "./utils/helper";
+import { createUserActivity } from "./services/useractivity";
+
+type Request = ExpressRequest & { requestIP?: string; userAgent?: string };
 
 const app = express();
 const httpServer = createServer(app);
@@ -19,6 +28,8 @@ const io = new Server(httpServer, {
     origin: "*",
   },
 });
+
+z.setErrorMap(zodErrorMap);
 
 // const serialConnection = new SerialConnection({
 //   portOptions: {
@@ -49,19 +60,11 @@ const DBUpdateQueue = new SharedQueue(MAX_QUEUE * 2);
 let databaseThread: Awaited<ReturnType<typeof spawn<DatabaseThread>>>;
 let printerThread: Awaited<ReturnType<typeof spawn<PrinterThread>>>;
 
-let batchInfo: {
-  batchNumber: string;
-  barcode: string;
-  estimate: number;
-} | null = null;
+let batchInfo: Batch | null = null;
 
 // let printProcess: Promise<void>;
 
-const startBatch = async (info: {
-  batchNumber: string;
-  barcode: string;
-  estimate: number;
-}) => {
+const startBatch = async (info: Batch) => {
   batchInfo = info;
 
   printedUpdateCount.set(0);
@@ -82,6 +85,7 @@ const startBatch = async (info: {
     DBUpdateBuffer: DBUpdateQueue.getBuffer(),
     isPrinterFinishedBuffer: isPrinterFinished.getBuffer(),
     displayMessageBuffer: displayMessage.getBuffer(),
+    batchInfo,
   });
 
   await printerThread.init({
@@ -92,6 +96,7 @@ const startBatch = async (info: {
     printCounterBuffer: printerCounter.getBuffer(),
     displayMessageBuffer: displayMessage.getBuffer(),
     isPrinterFinishedBuffer: isPrinterFinished.getBuffer(),
+    batchInfo,
   });
 };
 
@@ -164,13 +169,14 @@ const startPrintProcess = async () => {
       printQueue: printQueue.size(),
       printedQueue: printedQueue.size(),
       printedCount: printedConter,
-      targetQuantity: batchInfo ? batchInfo.estimate : 0,
+      targetQuantity: batchInfo ? batchInfo.qty : 0,
       displayMessage: displayMessage.get(),
       triggerCount: printedConter,
       goodReadCount: printedConter,
       matchCount: printedConter,
       mismatchCount: 0,
       noReadCount: 0,
+      scannedBarcode: "055500130207",
     });
 
     if (!isPrinting.get()) {
@@ -206,7 +212,7 @@ const startPrintProcess = async () => {
       printQueue: printQueue.size(),
       printedQueue: printedQueue.size(),
       printedCount: printedConter,
-      targetQuantity: batchInfo ? batchInfo.estimate : 0,
+      targetQuantity: batchInfo ? batchInfo.qty : 0,
       displayMessage: displayMessage.get(),
       triggerCount: printedConter,
       goodReadCount: printedConter,
@@ -277,45 +283,90 @@ io.on("connection", (socket) => {
 });
 
 app.use(express.json());
-app.use(mainRoutes);
+app.use(cors());
+app.use(async (req: Request, res, next) => {
+  const ipString =
+    req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? req.ip;
+  const userAgent = req.headers["user-agent"];
+  const ip = parseIP(ipString?.toString());
 
-app.post("/start-batch", (req, res) => {
-  const batchNumber = req.body.batchNumber;
+  req.requestIP = ip;
+  req.userAgent = userAgent;
 
-  const barcode = req.body.barcode;
-  const estimate = req.body.estimate;
-  if (
-    !batchNumber ||
-    !barcode ||
-    !estimate ||
-    typeof batchNumber !== "string" ||
-    typeof barcode !== "string" ||
-    typeof estimate !== "number"
-  ) {
-    return res.status(400).json({
-      message: "Failed",
-      error: "Invalid Param(s)",
-    });
-  }
-
-  const batchInfo = { batchNumber, barcode, estimate };
-  startBatch(batchInfo);
-  return res.status(200).json({ message: batchInfo });
+  next();
 });
 
-app.get("/start-print", (req, res) => {
+app.use(mainRoutes);
+
+app.post("/batch/start", async (req: Request, res) => {
+  try {
+    console.log("/batch/start", req.body);
+
+    const userId = 1000000; // ! ONLY FOR TESTING
+
+    const batch = await ActionBatch.startBatch(req.body, {
+      userId,
+      requestIP: req.requestIP,
+      userAgent: req.userAgent,
+    });
+
+    startBatch(batch);
+
+    return res
+      .status(200)
+      .json({ data: batch, message: "Success", success: true });
+  } catch (error: any) {
+    console.log("Error start batch", error);
+    const statusCode = error?.statusCode ?? 500;
+    const message = error?.message ?? "Something went wrong";
+    return res.status(statusCode).json({ message, success: false });
+  }
+});
+
+app.post("/print/start", async (req: Request, res) => {
   console.log("PRINT START INITIATED");
+
+  const userId = 1000000; // ! ONLY FOR TESTING
+
+  await createUserActivity({
+    actiontype: "START PRINT",
+    userid: userId,
+    ip: req.requestIP,
+    browser: req.userAgent,
+  });
+
   startPrintProcess();
   return res.status(200).json({ message: "Success" });
 });
 
-app.get("/stop-print", async (req, res) => {
+app.post("/print/stop", async (req: Request, res) => {
   console.log("PRINT STOP INITIATED");
+
+  const userId = 1000000; // ! ONLY FOR TESTING
+
+  await createUserActivity({
+    actiontype: "STOP PRINT",
+    userid: userId,
+    ip: req.requestIP,
+    browser: req.userAgent,
+  });
+
   isPrinting.set(false);
   return res.status(200).json({ message: "Success" });
 });
 
-app.get("/stop-batch", async (req, res) => {
+app.post("/batch/stop", async (req: Request, res) => {
+  console.log("BATCH STOP INITIATED");
+
+  const userId = 1000000; // ! ONLY FOR TESTING
+
+  await createUserActivity({
+    actiontype: "STOP BATCH",
+    userid: userId,
+    ip: req.requestIP,
+    browser: req.userAgent,
+  });
+
   isPrinting.set(false);
 
   if (databaseThread) {
@@ -330,11 +381,18 @@ app.get("/stop-batch", async (req, res) => {
   return res.status(200).json({ message: "Success" });
 });
 
-app.get("/test-socket", (req, res) => {
-  const data = req.body;
-  console.log("EMITTED", data);
-  io.emit("printStatus", data);
-  return res.status(200).json({ message: "Success" });
+app.get("/test-socket", (req: Request, res) => {
+  // const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+  console.log({
+    requestIP: req.requestIP,
+    userAgent: req.userAgent,
+  });
+
+  res.send(`IP Address: ${req.requestIP}, Browser: ${req.userAgent}`);
+  // const data = req.body;
+  // console.log("EMITTED", data);
+  // io.emit("printStatus", data);
+  // return res.status(200).json({ message: "Success" });
 });
 
 app.use(express.static(path.join(__dirname, "../client/dist")));

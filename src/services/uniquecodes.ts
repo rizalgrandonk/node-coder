@@ -1,15 +1,23 @@
 import db from "../db";
+import { UniqueCode } from "../types/data";
 
-export const getUniquecodes: (
-  limit?: number
-) => Promise<{ id: number; uniquecode: string }[] | undefined> = async (
-  limit: number = 250
-) => {
+export const getUniquecodes = async (data: {
+  limit: number;
+  productid: number;
+  batchid: number;
+  markingprinterid?: number;
+  printerlineid?: number;
+}) => {
+  const {
+    limit = 254,
+    productid,
+    batchid,
+    printerlineid = 9999,
+    markingprinterid = 9999,
+  } = data;
   const buffered = new Date();
-  const printerlineid = 9999;
-  const markingprinterid = 9999;
-  const productid = 1000005;
-  const batchid = 328;
+  // const productid = 1000005;
+  // const batchid = 328;
 
   const query = `
     WITH sub AS (
@@ -35,7 +43,7 @@ export const getUniquecodes: (
     RETURNING m."id", m."uniquecode";
   `;
 
-  const result = await db.query(query, [
+  const result = await db.query<UniqueCode>(query, [
     limit,
     buffered,
     printerlineid,
@@ -99,4 +107,14 @@ export const setBulkUNEStatus = async (
   const result = await db.query(query, [coderstatus, timestamp, uniquecodeIds]);
 
   return result.rowCount;
+};
+
+export const getAvailableUniquecodes = async () => {
+  const query = `SELECT COUNT(*) as count FROM uniquecode 
+  WHERE "buffered" IS NULL
+  AND "printed" IS NULL
+  AND "coderstatus" IS NULL
+  AND isactive = true`;
+  const result = await db.query<{ count: number }>(query);
+  return result.rows?.[0]?.count;
 };

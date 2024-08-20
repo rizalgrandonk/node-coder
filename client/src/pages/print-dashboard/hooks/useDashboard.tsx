@@ -18,14 +18,24 @@ import { useEffect, useState } from "react";
 // }
 
 type BarcodeScanCountDisplay = {
-  key: "triggerCount" | "goodReadCount" | "matchCount" | "mismatchCount" | "noReadCount";
+  key:
+    | "triggerCount"
+    | "goodReadCount"
+    | "matchCount"
+    | "mismatchCount"
+    | "noReadCount";
   val: number;
   caption: string;
   color: "default" | "secondary" | "danger" | "warning" | "success";
 };
 
 type BufferCountDisplay = {
-  key: "printerCounter" | "estimateQuantity" | "printedQueue" | "printQueue" | "maxPrintQueue";
+  key:
+    | "printerCounter"
+    | "estimateQuantity"
+    | "printedQueue"
+    | "printQueue"
+    | "maxPrintQueue";
   val: number;
   caption: string;
   color: "default" | "secondary" | "danger" | "warning" | "success";
@@ -44,6 +54,7 @@ export type DashboardSocketData = {
   matchCount: number;
   mismatchCount: number;
   noReadCount: number;
+  scannedBarcode: string;
 };
 
 // const bufferCountDisplay: Record<string, string> = {
@@ -65,7 +76,9 @@ const channel = "printStatus";
 
 export const useDashboard = () => {
   const socketCtx = useSocket();
-  const [bufferCountDisplay, setBufferCountDisplay] = useState<BufferCountDisplay[]>([
+  const [bufferCountDisplay, setBufferCountDisplay] = useState<
+    BufferCountDisplay[]
+  >([
     {
       key: "printerCounter",
       val: 0,
@@ -97,7 +110,9 @@ export const useDashboard = () => {
       color: "default",
     },
   ]);
-  const [barcodeScanCountDisplay, setBarcodeScanCountDisplay] = useState<BarcodeScanCountDisplay[]>([
+  const [barcodeScanCountDisplay, setBarcodeScanCountDisplay] = useState<
+    BarcodeScanCountDisplay[]
+  >([
     {
       key: "triggerCount",
       caption: "Trigger Count",
@@ -137,7 +152,13 @@ export const useDashboard = () => {
    */
   const setColorBufferCountDisplay = (data: DashboardSocketData) => {
     // Destructure the required properties from the DashboardSocketData object
-    const { printedCount, targetQuantity, printedQueue, printQueue, maxPrintQueue } = data;
+    const {
+      printedCount,
+      targetQuantity,
+      printedQueue,
+      printQueue,
+      maxPrintQueue,
+    } = data;
 
     // Update the bufferCountDisplay state with the provided values
     setBufferCountDisplay([
@@ -216,7 +237,13 @@ export const useDashboard = () => {
    * - If the noReadCount is greater than 0, the color is set to "warning".
    */
   const setColorBarcodeScanCountDisplay = (data: DashboardSocketData) => {
-    const { triggerCount, goodReadCount, matchCount, mismatchCount, noReadCount } = data;
+    const {
+      triggerCount,
+      goodReadCount,
+      matchCount,
+      mismatchCount,
+      noReadCount,
+    } = data;
     const barcodeScanCountDisplayData: BarcodeScanCountDisplay[] = [
       {
         key: "triggerCount",
@@ -233,7 +260,8 @@ export const useDashboard = () => {
             ? "secondary"
             : (triggerCount * 75) / 100 <= goodReadCount
             ? "success"
-            : (triggerCount * 75) / 100 > goodReadCount && (triggerCount * 60) / 100 <= goodReadCount
+            : (triggerCount * 75) / 100 > goodReadCount &&
+              (triggerCount * 60) / 100 <= goodReadCount
             ? "warning"
             : "danger",
       },
@@ -246,7 +274,8 @@ export const useDashboard = () => {
             ? "secondary"
             : (triggerCount * 75) / 100 <= matchCount
             ? "success"
-            : (triggerCount * 75) / 100 > matchCount && (triggerCount * 60) / 100 <= matchCount
+            : (triggerCount * 75) / 100 > matchCount &&
+              (triggerCount * 60) / 100 <= matchCount
             ? "warning"
             : "danger",
       },
@@ -254,13 +283,23 @@ export const useDashboard = () => {
         key: "mismatchCount",
         caption: "Mismatch Count",
         val: mismatchCount,
-        color: triggerCount === 0 ? "secondary" : mismatchCount === 0 ? "success" : "warning",
+        color:
+          triggerCount === 0
+            ? "secondary"
+            : mismatchCount === 0
+            ? "success"
+            : "warning",
       },
       {
         key: "noReadCount",
         caption: "No Read Count",
         val: noReadCount,
-        color: triggerCount === 0 ? "secondary" : noReadCount === 0 ? "success" : "warning",
+        color:
+          triggerCount === 0
+            ? "secondary"
+            : noReadCount === 0
+            ? "success"
+            : "warning",
       },
     ];
     setBarcodeScanCountDisplay(barcodeScanCountDisplayData);

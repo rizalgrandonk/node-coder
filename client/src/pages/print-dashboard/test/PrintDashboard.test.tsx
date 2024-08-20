@@ -1,4 +1,4 @@
-import { render, fireEvent, act } from "@testing-library/react";
+import { render, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import PrintDashboardPage from "../PrintDashboard";
@@ -7,6 +7,20 @@ import { usePrintData } from "@/context/print";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { Mock } from "vitest";
 import { DashboardSocketData } from "../hooks/useDashboard";
+import { startPrint, stopPrint } from "@/services/printService";
+import { stopBatch } from "@/services/batchService";
+
+// Mock useNavigate
+const mockNavigate = vi.fn().mockImplementation((to) => {
+  console.log("MOCK CALLS", to);
+});
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual ?? {}),
+    useNavigate: () => mockNavigate,
+  };
+});
 
 // Mock useSocket and usePrintData hooks
 vi.mock("@/context/socket", () => ({
@@ -26,6 +40,14 @@ vi.mock("./hooks/useDashboard", () => ({
   })),
 }));
 
+vi.mock("@/services/printService", () => ({
+  startPrint: vi.fn(),
+  stopPrint: vi.fn(),
+}));
+vi.mock("@/services/batchService", () => ({
+  stopBatch: vi.fn(),
+}));
+
 const mockSocketContext = {
   context: {
     on: vi.fn(),
@@ -35,17 +57,21 @@ const mockSocketContext = {
 };
 
 const mockPrintDataContext = {
-  printData: {},
+  printData: [
+    {
+      personel: "AkenSejati",
+      productName:
+        "Pembersih Lantai SOS Apple Wonder 700 / 750 ml S.O.S Aroma Apel",
+      barcode: "055500130207",
+      scannedBarcode: "055500130207",
+      batchNo: "BATCH-055500130207-0001",
+      printEstimate: 0,
+      availableCount: 0,
+    },
+  ],
   updatePrintData: vi.fn(),
   clearPrintData: vi.fn(),
 };
-
-// Mock useNavigate
-const mockNavigate = vi.fn();
-vi.mock("react-router-dom", async () => ({
-  ...(await vi.importActual("react-router-dom")),
-  useNavigate: () => mockNavigate,
-}));
 
 const defaultSocketData: DashboardSocketData = {
   isPrinting: true,
@@ -60,6 +86,7 @@ const defaultSocketData: DashboardSocketData = {
   matchCount: 0,
   mismatchCount: 0,
   noReadCount: 0,
+  scannedBarcode: "",
 };
 
 describe("PrintDashboardPage", () => {
@@ -73,37 +100,16 @@ describe("PrintDashboardPage", () => {
   });
 
   /**
-   * Test case to verify that the `updatePrintData` method is called
-   * with the correct data on initial render.
-   */
-  it("should update print data on initial render", () => {
-    render(
-      <MemoryRouter>
-        <PrintDashboardPage />
-      </MemoryRouter>
-    );
-    expect(mockPrintDataContext.updatePrintData).toHaveBeenCalledWith({
-      personel: "AkenSejati",
-      productName: "Pembersih Lantai SOS Apple Wonder 700 / 750 ml S.O.S Aroma Apel",
-      barcode: "055500130207",
-      scannedBarcode: "055500130207",
-      batchNo: "BATCH-055500130207-0001",
-      printEstimate: 0,
-      availableCount: 0,
-    });
-    /**
-     * This test case verifies that the `updatePrintData` method is called
-     * with the correct data on initial render. The `updatePrintData` method
-     * is used to update the print data in the context.
-     */
-  });
-
-  /**
    * Test case to verify that the Start Print button click is handled correctly.
    * The button click should emit the "startPrint" event and update the
    * display message.
    */
   it("should handle Start Print button click", async () => {
+    (startPrint as Mock).mockResolvedValue({
+      success: true,
+      message: "Print started",
+    });
+
     let socketCallback: (val: DashboardSocketData) => void;
     (mockSocketContext.context.on as Mock).mockImplementation((_, cb) => {
       socketCallback = cb;
@@ -128,7 +134,7 @@ describe("PrintDashboardPage", () => {
       });
     });
 
-    expect(mockSocketContext.context.emit).toHaveBeenCalledWith("startPrint");
+    expect(startPrint).toHaveBeenCalledTimes(1);
     expect(
       getAllByRole("button", {
         name: /Stop Print/i,
@@ -142,6 +148,15 @@ describe("PrintDashboardPage", () => {
    * display message.
    */
   it("should handle Stop Print button click", async () => {
+    (startPrint as Mock).mockResolvedValue({
+      success: true,
+      message: "Print started",
+    });
+    (stopPrint as Mock).mockResolvedValue({
+      success: true,
+      message: "Print stopped",
+    });
+
     let socketCallback: (val: DashboardSocketData) => void;
     (mockSocketContext.context.on as Mock).mockImplementation((_, cb) => {
       socketCallback = cb;
@@ -178,7 +193,7 @@ describe("PrintDashboardPage", () => {
       });
     });
 
-    expect(mockSocketContext.context.emit).toHaveBeenCalledWith("stopPrint");
+    expect(stopPrint).toHaveBeenCalledTimes(1);
     expect(
       getAllByRole("button", {
         name: /Start Print/i,
@@ -226,19 +241,23 @@ describe("PrintDashboardPage", () => {
    * Test case to verify that the Stop Batch button click is handled correctly.
    * The button click should emit the "stopBatch" event.
    */
-  it("should handle Stop Batch button click", () => {
+  it("should handle Stop Batch button click", async () => {
+    (stopBatch as Mock).mockResolvedValue({
+      success: true,
+      message: "Batch stopped",
+    });
+
     const { getByText } = render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/"]}>
         <PrintDashboardPage />
       </MemoryRouter>
     );
 
     const endBatchButton = getByText(/End Batch/i);
-    act(() => {
-      fireEvent.click(endBatchButton);
-    });
 
-    // expect(mockPrintDataContext.clearPrintData).toHaveBeenCalled();
-    expect(mockSocketContext.context.emit).toHaveBeenCalledWith("stopBatch");
+    await userEvent.click(endBatchButton);
+
+    expect(stopBatch).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
 });

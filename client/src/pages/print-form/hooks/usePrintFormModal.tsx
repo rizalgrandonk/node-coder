@@ -1,41 +1,54 @@
 import { useState } from "react";
-
-type PersonelType = {
-  id: string;
-  nik: string;
-  name: string;
-};
-
-type ProductType = {
-  id: string;
-  name: string;
-  description: string;
-};
+import type { Product } from "@/types/product";
 
 export const usePrintFormModal = () => {
-  const [personel, setPersonel] = useState<PersonelType | undefined>();
-  const [product, setProduct] = useState<ProductType | undefined>();
-  const [showPersonelModal, setShowPersonelModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
 
-  const lookupPersonelSubmitHandler = (personel: PersonelType) => {
-    setPersonel(personel);
-    setShowPersonelModal(false);
-  };
+  const getProductByBarcode = async (barcode: string) => {
+    console.log("getProductByBarcode", barcode);
+    const product: Product = {
+      name: "SGM EKSPLOR SOYA MADU 400G",
+      // received: "",
+      // description: null,
+      upc: "8999099923548",
+      maxbuffer: 0,
+      localminlevel: 0,
+      localmaxlevel: 0,
+      codekey: "SGMES400M",
+      endqueue: 0,
+      availableqty: 0,
+      isactive: true,
+      id: 1000068,
+      cardboardwidth: 278,
+      cardboardlength: 0,
+      widthallowance: 10,
+    };
 
-  const lookupProductSubmitHandler = (product: ProductType) => {
-    setProduct(product);
-    setShowProductModal(false);
+    /**
+     * 
+     * name:SGM EKSPLOR SOYA MADU 400G
+        received:
+        description:
+        upc:8999099923548
+        maxbuffer:0
+        localminlevel:0
+        localmaxlevel:0
+        codekey:SGMES400M
+        endqueue:0
+        availableqty:0
+        isactive:true
+        id:1000068
+        cardboardwidth:278
+        cardboardlength:0
+        widthallowance:10
+     */
+
+    return product;
   };
 
   return {
-    personel,
-    product,
-    showPersonelModal,
     showProductModal,
-    setShowPersonelModal,
     setShowProductModal,
-    lookupPersonelSubmitHandler,
-    lookupProductSubmitHandler,
+    getProductByBarcode,
   };
 };

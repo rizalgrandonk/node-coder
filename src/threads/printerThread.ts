@@ -25,6 +25,7 @@ import {
   PRINTER_MESSAGE_LIST,
   ErrorList,
 } from "../utils/errors";
+import { Batch } from "../types/data";
 
 // Delay Interval when opening nozzle
 const NOZZLE_OPEN_DELAY = Number(process.env.NOZZLE_OPEN_DELAY ?? 7500);
@@ -85,6 +86,8 @@ let prevLastStartPrinNo: number = 0;
 
 let openNozzleAttempt = 0;
 
+let batchData: Batch;
+
 type InitParams = {
   isPrintBuffer: SharedArrayBuffer;
   printBuffer: SharedArrayBuffer;
@@ -93,6 +96,7 @@ type InitParams = {
   DBUpdateBuffer: SharedArrayBuffer;
   displayMessageBuffer: SharedArrayBuffer;
   isPrinterFinishedBuffer: SharedArrayBuffer;
+  batchInfo: Batch;
 };
 // ? Initialization function for shared buffers
 const init = ({
@@ -103,6 +107,7 @@ const init = ({
   DBUpdateBuffer,
   displayMessageBuffer,
   isPrinterFinishedBuffer,
+  batchInfo,
 }: InitParams) => {
   printCounter = new SharedPrimitive<number>(printCounterBuffer);
   isPrinting = new SharedPrimitive<boolean>(isPrintBuffer);
@@ -111,6 +116,8 @@ const init = ({
   printedQueue = new SharedQueue(printedBuffer);
   DBUpdateQueue = new SharedQueue(DBUpdateBuffer);
   isPrinterFinished = new SharedPrimitive<boolean>(isPrinterFinishedBuffer);
+
+  batchData = batchInfo;
 };
 
 // ? Function for wait until the printer connection is ready

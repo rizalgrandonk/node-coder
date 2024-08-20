@@ -4,6 +4,8 @@ import { z } from "zod";
 const envSchema = z.object({
   VITE_APP_ENVIRONTMENT: z.enum(["development", "production"]),
   VITE_APP_WEBSOCKET_URL: z.string().url(),
+  VITE_APP_SERVER_URL: z.string().url(),
+  VITE_APP_SERVER_REQUEST_TIMEOUT: z.string(),
 });
 
 // Parse and validate environment variables

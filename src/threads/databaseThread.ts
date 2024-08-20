@@ -6,6 +6,7 @@ import {
 } from "../services/uniquecodes";
 import { chunkArray, sleep } from "../utils/helper";
 import { QueueItem, SharedPrimitive, SharedQueue } from "../utils/sharedBuffer";
+import { Batch } from "../types/data";
 
 // Constants to define the maximum and minimum number of items in the print queue.
 const MAX_PRINT_QUEUE = Number(process.env.MAX_PRINT_QUEUE ?? 254);
@@ -21,6 +22,8 @@ let printQueue: SharedQueue;
 let printedQueue: SharedQueue;
 let DBUpdateQueue: SharedQueue;
 
+let batchData: Batch;
+
 // Type definition for the parameters needed to initialize the shared buffers.
 type InitParams = {
   isPrintBuffer: SharedArrayBuffer;
@@ -31,6 +34,7 @@ type InitParams = {
   printedBuffer: SharedArrayBuffer;
   DBUpdateBuffer: SharedArrayBuffer;
   displayMessageBuffer: SharedArrayBuffer;
+  batchInfo: Batch;
 };
 
 // Initialize shared variables with the provided buffers.
@@ -43,6 +47,7 @@ const init = ({
   printerCounterBuffer,
   displayMessageBuffer,
   printedUpdateCountBuffer,
+  batchInfo,
 }: InitParams) => {
   isPrinting = new SharedPrimitive<boolean>(isPrintBuffer); // Tracks if printing is ongoing.
   isPrinterFinished = new SharedPrimitive<boolean>(isPrinterFinishedBuffer); // Indicates if the printer has finished its task.
@@ -52,6 +57,8 @@ const init = ({
   printQueue = new SharedQueue(printBuffer); // Queue for items waiting to be printed.
   printedQueue = new SharedQueue(printedBuffer); // Queue for items that have been printed.
   DBUpdateQueue = new SharedQueue(DBUpdateBuffer); // Queue for database update tasks.
+
+  batchData = batchInfo;
 };
 
 // Main function that manages the printing process and updates the queues.
@@ -125,7 +132,11 @@ async function resetBuffer(resetQueue: QueueItem[]) {
 
 // Fetch new unique codes to add to the print queue.
 async function populateBufer(limit: number) {
-  const newUniquecodes = await getUniquecodes(limit); // Retrieve new unique codes.
+  const newUniquecodes = await getUniquecodes({
+    limit,
+    productid: batchData.productid,
+    batchid: batchData.id,
+  }); // Retrieve new unique codes.
   if (newUniquecodes) {
     return newUniquecodes; // Return the fetched unique codes.
   } else {
