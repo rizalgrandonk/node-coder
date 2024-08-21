@@ -1,8 +1,5 @@
-import { startBatch } from "../batch";
-import {
-  createBatch,
-  getBatchByBatchNoAndProductId,
-} from "../../services/batch";
+import { startBatch, endBatch } from "../batch";
+import { createBatch, findById, getBatchByBatchNoAndProductId, updateBatch } from "../../services/batch";
 import { createUserActivity } from "../../services/useractivity";
 import { getProductById } from "../../services/product";
 import { getAvailableUniquecodes } from "../../services/uniquecodes";
@@ -13,6 +10,8 @@ import { zodErrorMap } from "../../utils/zod";
 // Mock the external services
 jest.mock("../../services/batch", () => ({
   createBatch: jest.fn(),
+  updateBatch: jest.fn(),
+  findById: jest.fn(),
   getBatchByBatchNoAndProductId: jest.fn(),
 }));
 
@@ -30,8 +29,8 @@ jest.mock("../../services/uniquecodes", () => ({
 
 z.setErrorMap(zodErrorMap);
 
+const userId = 1;
 describe("Start Batch", () => {
-  const userId = 1;
   const validBatch = {
     batchNo: "12345",
     barcode: "67890",
@@ -41,29 +40,21 @@ describe("Start Batch", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (getAvailableUniquecodes as jest.Mock).mockResolvedValue(1000);
   });
 
   it("should throw a validation error if input is invalid", async () => {
     const invalidBatch = { ...validBatch, batchNo: "" };
 
-    await expect(
-      startBatch({ batchs: [invalidBatch] }, { userId })
-    ).rejects.toThrow(ApiError);
-    await expect(
-      startBatch({ batchs: [invalidBatch] }, { userId })
-    ).rejects.toThrow("Invalid Parameter (batchs.0.batchNo)");
+    await expect(startBatch({ batchs: [invalidBatch] }, { userId })).rejects.toThrow(ApiError);
+    await expect(startBatch({ batchs: [invalidBatch] }, { userId })).rejects.toThrow("Invalid Parameter (batchs.0.batchNo)");
   });
 
   it("should return existing batch if it already exists and create user activity", async () => {
     const existingBatch = { id: 1 };
-    (getBatchByBatchNoAndProductId as jest.Mock).mockResolvedValue(
-      existingBatch
-    );
+    (getBatchByBatchNoAndProductId as jest.Mock).mockResolvedValue(existingBatch);
 
-    const result = await startBatch(
-      { batchs: [validBatch] },
-      { userId, requestIP: "127.0.0.1", userAgent: "Chrome" }
-    );
+    const result = await startBatch({ batchs: [validBatch] }, { userId, requestIP: "127.0.0.1", userAgent: "Chrome" });
 
     expect(result).toBe(existingBatch);
     expect(getBatchByBatchNoAndProductId).toHaveBeenCalledWith("12345", 2);
@@ -80,9 +71,7 @@ describe("Start Batch", () => {
     (getBatchByBatchNoAndProductId as jest.Mock).mockResolvedValue(null);
     (getProductById as jest.Mock).mockResolvedValue(null);
 
-    await expect(
-      startBatch({ batchs: [validBatch] }, { userId })
-    ).rejects.toThrow("Product not found");
+    await expect(startBatch({ batchs: [validBatch] }, { userId })).rejects.toThrow("Product not found");
   });
 
   it("should throw an error if available quantity is less than estimate", async () => {
@@ -90,11 +79,7 @@ describe("Start Batch", () => {
     (getProductById as jest.Mock).mockResolvedValue({ id: 2 });
     (getAvailableUniquecodes as jest.Mock).mockResolvedValue(5);
 
-    await expect(
-      startBatch({ batchs: [validBatch] }, { userId })
-    ).rejects.toThrow(
-      "Estimate Quantity Shouldn't higher than Available Quantity(5)"
-    );
+    await expect(startBatch({ batchs: [validBatch] }, { userId })).rejects.toThrow("Estimate Quantity Shouldn't higher than Available Quantity(5)");
   });
 
   it("should create a new batch if conditions are met and create user activity", async () => {
@@ -104,10 +89,7 @@ describe("Start Batch", () => {
     (getAvailableUniquecodes as jest.Mock).mockResolvedValue(10);
     (createBatch as jest.Mock).mockResolvedValue(newBatch);
 
-    const result = await startBatch(
-      { batchs: [validBatch] },
-      { userId, requestIP: "127.0.0.1", userAgent: "Chrome" }
-    );
+    const result = await startBatch({ batchs: [validBatch] }, { userId, requestIP: "127.0.0.1", userAgent: "Chrome" });
 
     expect(result).toBe(newBatch);
     expect(createBatch).toHaveBeenCalledWith({
@@ -130,8 +112,58 @@ describe("Start Batch", () => {
     (getAvailableUniquecodes as jest.Mock).mockResolvedValue(10);
     (createBatch as jest.Mock).mockResolvedValue(null);
 
-    await expect(
-      startBatch({ batchs: [validBatch] }, { userId })
-    ).rejects.toThrow("Failed to create batch");
+    await expect(startBatch({ batchs: [validBatch] }, { userId })).rejects.toThrow("Failed to create batch");
+  });
+});
+
+describe("Stop Batch", () => {
+  const validBatch = {
+    id: 2055,
+    userId: 1000000,
+    blockcodecount: 1,
+    printedqty: 0,
+    triggercount: 0,
+    goodreadcount: 0,
+    noreadcount: 0,
+    matchcount: 0,
+    mismatchcount: 10,
+    updated: new Date("2024-08-21T10:30:12.639Z"),
+    updatedby: 1000000,
+    isactive: true,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (updateBatch as jest.Mock).mockResolvedValue(validBatch);
+    (findById as jest.Mock).mockResolvedValue(validBatch);
+  });
+
+  it("should update batch successfully", async () => {
+    const result = await endBatch({ batchs: [validBatch] });
+    expect(result).toEqual(validBatch);
+  });
+
+  it("should throw a validation error if required fields are missing", async () => {
+    const invalidBatch = { ...validBatch, id: undefined };
+    await expect(endBatch({ batchs: [invalidBatch] })).rejects.toThrow(ApiError);
+    await expect(endBatch({ batchs: [invalidBatch] })).rejects.toThrow("Empty Mandatory Parameter (batchs.0.id)");
+  });
+
+  it("should throw an error if batch is not found", async () => {
+    (findById as jest.Mock).mockResolvedValue(undefined);
+    await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow(ApiError);
+    await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow("Batch not found");
+  });
+
+  it("should throw an error if batch is not active", async () => {
+    (findById as jest.Mock).mockResolvedValue({ ...validBatch, isactive: false });
+    await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow(ApiError);
+    await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow("Batch is not active");
+  });
+
+  it("should throw an error if update batch fails", async () => {
+    (updateBatch as jest.Mock).mockResolvedValue(undefined);
+    await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow(ApiError);
+    await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow("Failed to update batch");
   });
 });

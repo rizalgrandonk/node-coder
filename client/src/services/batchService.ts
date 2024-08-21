@@ -1,7 +1,7 @@
 import { Batch } from "@/types/batch";
 import fetchRequest from "@/utils/fetch";
 
-type CreateBatchRequest = {
+type StartBatchRequest = {
   batchs: {
     batchNo: string;
     barcode: string;
@@ -9,22 +9,26 @@ type CreateBatchRequest = {
     productId: number;
   }[];
 };
+type StartBatchResponse = {
+  data: Batch;
+};
 
-export const startBatch = async (data: CreateBatchRequest) => {
+export const startBatch = async (data: StartBatchRequest) => {
   const path = "/batch/start";
   const method = "POST";
-  const response = await fetchRequest<Batch>(path, {
+  const response = await fetchRequest<StartBatchResponse>(path, {
     method,
     body: JSON.stringify(data),
   });
   return response;
 };
 
-export const stopBatch = async () => {
+export const stopBatch = async (ids: number) => {
   const path = "/batch/stop";
   const method = "POST";
   const response = await fetchRequest<Batch>(path, {
     method,
+    body: JSON.stringify({ batchs: [ids] }),
   });
   return response;
 };

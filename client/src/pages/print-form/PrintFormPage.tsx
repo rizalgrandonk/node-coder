@@ -30,8 +30,8 @@ const PrintDataSchema = z.object({
           message: "Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed.",
         }),
       printEstimate: z
-        .number({ message: "Estimate Quantity is Required and should be numeric and not containing symbol" })
-        .int("Estimate Quantity should be numeric and not containing symbol")
+        .number({ message: "Estimate Quantity is Required and should be numeric value without symbol" })
+        .int("Estimate Quantity should be numeric value without symbol")
         .gte(1),
       barcode: z.string().min(1),
       productName: z.string().min(1, { message: "Product is Required" }),
@@ -83,19 +83,6 @@ const PrintFormPage = () => {
     setIsLoading(true);
     console.log("Form Submit Handler", formData);
 
-    const batchs = formData.batchs.map((item, index) => ({
-      batchNo: item.batchNo,
-      barcode: item.barcode,
-      productId: item.productId,
-      productName: item.productName,
-      quantity: item.printEstimate,
-      printerLineId: 1,
-      markingPrinterId: connectedPrinter[index],
-    }));
-
-    // Update Print Data Context
-    printDataCtx.updatePrintData(batchs);
-
     // Send Create Batch Request To Server
     const createdBatchRequest = {
       batchs: formData.batchs.map((item) => ({
@@ -105,11 +92,28 @@ const PrintFormPage = () => {
         productId: item.productId,
       })),
     };
-    const createdBatch = await startBatch(createdBatchRequest);
-    if (createdBatch.success) {
+    const createdBatchResponse = await startBatch(createdBatchRequest);
+    if (createdBatchResponse.success && createdBatchResponse.data) {
+      const createdBatch = createdBatchResponse.data.data;
+      console.log("Created Batch", createdBatchResponse);
+      const batchs = formData.batchs.map((item, index) => {
+        return {
+          batchId: createdBatch.id,
+          batchNo: item.batchNo,
+          barcode: item.barcode,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.printEstimate,
+          printerLineId: 1,
+          markingPrinterId: connectedPrinter[index],
+        };
+      });
+
+      // Update Print Data Context
+      printDataCtx.updatePrintData(batchs);
       navigate("/dashboard");
     } else {
-      setAlertMessage(createdBatch.message ?? "Something went wrong");
+      setAlertMessage(createdBatchResponse.message ?? "Something went wrong");
     }
     setIsLoading(false);
   };

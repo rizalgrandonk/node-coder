@@ -1,16 +1,11 @@
-import {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
 export type PrintData = {
   productId: number;
   productName: string;
-  barcode: string;
+  batchId: number;
   batchNo: string;
+  barcode: string;
   quantity: number;
   printerLineId: number;
   markingPrinterId: number;
@@ -32,9 +27,7 @@ const PrintContext = createContext<PrintContextType>({
 
 export const usePrintData = () => useContext(PrintContext);
 
-export const PrintDataProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
+export const PrintDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [printData, setPrintData] = useState<PrintData[]>([]);
 
   useEffect(() => {
@@ -56,11 +49,5 @@ export const PrintDataProvider: React.FC<{ children: ReactNode }> = ({
 
   const hasFilledForm = printData.length > 0;
 
-  return (
-    <PrintContext.Provider
-      value={{ printData, updatePrintData, clearPrintData, hasFilledForm }}
-    >
-      {children}
-    </PrintContext.Provider>
-  );
+  return <PrintContext.Provider value={{ printData, updatePrintData, clearPrintData, hasFilledForm }}>{children}</PrintContext.Provider>;
 };
