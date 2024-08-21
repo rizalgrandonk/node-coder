@@ -87,7 +87,7 @@ describe("PrintFormPage", () => {
     await userEvent.click(startBatchButtons);
 
     const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
-    expect(batchNoInputErrorMessage.textContent).toEqual("Only uppercase alphanumeric characters, dashes, and slashes are allowed.");
+    expect(batchNoInputErrorMessage.textContent).toEqual("Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed.");
   });
 
   it("should display error when Input BatchNo With Symbol Except Dash (-) & Slash (/)", async () => {
@@ -103,7 +103,7 @@ describe("PrintFormPage", () => {
     await userEvent.click(startBatchButtons);
 
     const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
-    expect(batchNoInputErrorMessage.textContent).toEqual("Only uppercase alphanumeric characters, dashes, and slashes are allowed.");
+    expect(batchNoInputErrorMessage.textContent).toEqual("Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed.");
   });
 
   it("should transform Text To Uppercase when Insert BatchNo with Lowercase", async () => {
@@ -153,7 +153,7 @@ describe("PrintFormPage", () => {
     await userEvent.click(startBatchButtons);
 
     const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
-    expect(batchNoInputErrorMessage.textContent).toEqual("String must contain at least 1 character(s)");
+    expect(batchNoInputErrorMessage.textContent).toEqual("Batch Number is Required");
   });
 
   it("should display error when Submit Batch without Input Product", async () => {
@@ -167,7 +167,7 @@ describe("PrintFormPage", () => {
     await userEvent.click(startBatchButtons);
 
     const productInputErrorMessage = screen.getByTestId("productName-0-inputErrorMessage");
-    expect(productInputErrorMessage.textContent).toEqual("String must contain at least 1 character(s)");
+    expect(productInputErrorMessage.textContent).toEqual("Product is Required");
   });
 
   it("should display error when Submit Batch without Input Estimate Quantity", async () => {
@@ -183,7 +183,7 @@ describe("PrintFormPage", () => {
     await userEvent.click(startBatchButtons);
 
     const printEstimateInputErrorMessage = screen.getByTestId("printEstimate-0-inputErrorMessage");
-    expect(printEstimateInputErrorMessage.textContent).toEqual("Expected number, received nan");
+    expect(printEstimateInputErrorMessage.textContent).toEqual("Estimate Quantity is Required and should be numeric and not containing symbol");
   });
 
   it("should display error when Estimate Quantity More Than Available Quantity", async () => {

@@ -24,14 +24,17 @@ const PrintDataSchema = z.object({
       availableCount: z.number(),
       batchNo: z
         .string()
-        .min(1)
+        .min(1, { message: "Batch Number is Required" })
         .max(255)
         .regex(/^[A-Z0-9\-\/]+$/, {
-          message: "Only uppercase alphanumeric characters, dashes, and slashes are allowed.",
+          message: "Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed.",
         }),
-      printEstimate: z.number().gte(1),
+      printEstimate: z
+        .number({ message: "Estimate Quantity is Required and should be numeric and not containing symbol" })
+        .int("Estimate Quantity should be numeric and not containing symbol")
+        .gte(1),
       barcode: z.string().min(1),
-      productName: z.string().min(1),
+      productName: z.string().min(1, { message: "Product is Required" }),
       productId: z.number().gte(1),
     })
   ),
