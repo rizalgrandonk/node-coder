@@ -30,6 +30,7 @@ const defaultSocketData: DashboardSocketData = {
   matchCount: 0,
   mismatchCount: 0,
   noReadCount: 0,
+  scannedBarcode: "",
 };
 
 describe("useDashboard Hook", () => {
@@ -184,6 +185,7 @@ describe("useDashboard Hook", () => {
       matchCount: 74, // count of matches
       mismatchCount: 6, // count of mismatches
       noReadCount: 10, // count of no reads
+      scannedBarcode: "", // scanned barcode
     };
 
     // Function to be called when receiving socket data

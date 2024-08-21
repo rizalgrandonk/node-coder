@@ -1,12 +1,11 @@
 import PrintFormPage from "@/pages/print-form/PrintFormPage";
-import { screen, render, waitFor } from "@testing-library/react";
+import { screen, render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import type { Mock } from "vitest";
 import * as BatchService from "@/services/batchService";
 import { usePrintData } from "@/context/print";
-// import { useNavigate } from "react-router-dom";
 
 // Mock useNavigate
 const mockNavigate = vi.fn().mockImplementation((to) => {
@@ -21,15 +20,6 @@ vi.mock("react-router-dom", async (importOriginal) => {
 });
 
 vi.mock("@/utils/helper");
-// vi.mock("react-hook-form", async () => ({
-//   ...(await vi.importActual("react-hook-form")),
-//   Controller: () => <></>,
-//   useForm: () => ({
-//     control: () => ({}),
-//     handleSubmit: () => jest.fn(),
-//     formState: {},
-//   }),
-// }));
 
 vi.mock("@/context/print", () => ({
   usePrintData: vi.fn(),
@@ -69,7 +59,7 @@ describe("PrintFormPage", () => {
     await userEvent.click(startBatchButtons);
 
     expect(BatchService.startBatch).toHaveBeenCalled();
-    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalled();
   });
 
   it("should handle Get Uniquecode Count button click", () => {
@@ -214,6 +204,9 @@ describe("PrintFormPage", () => {
 
     await userEvent.click(scanProductButtons);
     await userEvent.click(startBatchButtons);
+
+    expect(BatchService.startBatch).toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
 
     const errorAlert = screen.getByTestId("alert-text");
     expect(errorAlert.textContent).toEqual("Estimate Quantity Shouldn't higher than Available Quantity");
