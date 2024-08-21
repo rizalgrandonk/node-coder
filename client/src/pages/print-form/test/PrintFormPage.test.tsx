@@ -1,5 +1,5 @@
 import PrintFormPage from "@/pages/print-form/PrintFormPage";
-import { screen, render } from "@testing-library/react";
+import { screen, render, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { vi, describe, it, expect, beforeEach } from "vitest";
@@ -79,58 +79,143 @@ describe("PrintFormPage", () => {
       </MemoryRouter>
     );
 
-    const getUniqueCodeCountButtons = screen.getByTestId(
-      "availableUniquecodeCount-button"
-    );
+    const getUniqueCodeCountButtons = screen.getByTestId("availableUniquecodeCount-button");
     userEvent.click(getUniqueCodeCountButtons);
     expect(getUniqueCodeCountButtons).toBeTruthy();
   });
 
-  it("should display error when Input BatchNo with Space", () => {
+  it("should display error when Input BatchNo with Space", async () => {
     render(
       <MemoryRouter>
         <PrintFormPage />
       </MemoryRouter>
     );
+
+    const batchNoInput = screen.getByTestId("batchNo-0-input");
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    await userEvent.type(batchNoInput, "BATCH 1");
+    await userEvent.click(startBatchButtons);
+
+    const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
+    expect(batchNoInputErrorMessage.textContent).toEqual("Only uppercase alphanumeric characters, dashes, and slashes are allowed.");
   });
 
-  it("should display error when Input BatchNo With Symbol Except Dash (-) & Slash (/)", () => {
+  it("should display error when Input BatchNo With Symbol Except Dash (-) & Slash (/)", async () => {
     render(
       <MemoryRouter>
         <PrintFormPage />
       </MemoryRouter>
     );
+
+    const batchNoInput = screen.getByTestId("batchNo-0-input");
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    await userEvent.type(batchNoInput, "BATCH#1");
+    await userEvent.click(startBatchButtons);
+
+    const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
+    expect(batchNoInputErrorMessage.textContent).toEqual("Only uppercase alphanumeric characters, dashes, and slashes are allowed.");
   });
 
-  it("should display error when Insert BatchNo with Lowercase", () => {
+  it("should transform Text To Uppercase when Insert BatchNo with Lowercase", async () => {
     render(
       <MemoryRouter>
         <PrintFormPage />
       </MemoryRouter>
     );
+
+    const batchNoInput = screen.getByTestId("batchNo-0-input");
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    await userEvent.type(batchNoInput, "batch-1");
+    await userEvent.click(startBatchButtons);
+
+    expect(batchNoInput).toHaveDisplayValue("BATCH-1");
   });
 
-  it("should display error when Insert BatchNo More Than 255 Characters", () => {
+  it("should display error when Insert BatchNo More Than 255 Characters", async () => {
     render(
       <MemoryRouter>
         <PrintFormPage />
       </MemoryRouter>
     );
+
+    const batchNoInput = screen.getByTestId("batchNo-0-input");
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    await userEvent.type(
+      batchNoInput,
+      "asiughwiujfjksnwiougwgnsnsnfsfnnalsnohrwgrwgiowklsfslkfmoidfadfmalfowgwiglkwfwkfggjrklgmsflgdfgnhugtwkdflsfmpsdogkwrgjsjgksglsdkgoaghaoswdfgoshgasgnoaghnowglskgmnoasghaowhgoasgklsadgosdgisodghwgsjglskgmapwgkwopgjgirgpodsjgapgjapdgjasdgmaigsdofvidookofksdsp"
+    );
+    await userEvent.click(startBatchButtons);
+
+    const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
+    expect(batchNoInputErrorMessage.textContent).toEqual("String must contain at most 255 character(s)");
   });
 
-  it("should display error when Submit Batch without Input BatchNo", () => {
+  it("should display error when Submit Batch without Input BatchNo", async () => {
     render(
       <MemoryRouter>
         <PrintFormPage />
       </MemoryRouter>
     );
+
+    const batchNoInput = screen.getByTestId("batchNo-0-input");
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    await userEvent.clear(batchNoInput);
+    await userEvent.click(startBatchButtons);
+
+    const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
+    expect(batchNoInputErrorMessage.textContent).toEqual("String must contain at least 1 character(s)");
   });
 
-  it("should display error when Submit Batch without Input Product", () => {
+  it("should display error when Submit Batch without Input Product", async () => {
     render(
       <MemoryRouter>
         <PrintFormPage />
       </MemoryRouter>
     );
+
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    await userEvent.click(startBatchButtons);
+
+    const productInputErrorMessage = screen.getByTestId("productName-0-inputErrorMessage");
+    expect(productInputErrorMessage.textContent).toEqual("String must contain at least 1 character(s)");
+  });
+
+  it("should display error when Submit Batch without Input Estimate Quantity", async () => {
+    render(
+      <MemoryRouter>
+        <PrintFormPage />
+      </MemoryRouter>
+    );
+
+    const printEstimateInput = screen.getByTestId("printEstimate-0-input");
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    await userEvent.clear(printEstimateInput);
+    await userEvent.click(startBatchButtons);
+
+    const printEstimateInputErrorMessage = screen.getByTestId("printEstimate-0-inputErrorMessage");
+    expect(printEstimateInputErrorMessage.textContent).toEqual("Expected number, received nan");
+  });
+
+  it("should display error when Estimate Quantity More Than Available Quantity", async () => {
+    vi.spyOn(BatchService, "startBatch").mockResolvedValue({ success: false, message: "Estimate Quantity Shouldn't higher than Available Quantity" });
+    render(
+      <MemoryRouter>
+        <PrintFormPage />
+      </MemoryRouter>
+    );
+
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    const scanProductButtons = screen.getByTestId("productName-0-button");
+    const batchNoInput = screen.getByTestId("batchNo-0-input");
+    const estimateQuantityInput = screen.getByTestId("printEstimate-0-input");
+
+    await userEvent.type(batchNoInput, "BATCH-1");
+    await userEvent.type(estimateQuantityInput, "100");
+
+    await userEvent.click(scanProductButtons);
+    await userEvent.click(startBatchButtons);
+
+    const errorAlert = screen.getByTestId("alert-text");
+    expect(errorAlert.textContent).toEqual("Estimate Quantity Shouldn't higher than Available Quantity");
   });
 });

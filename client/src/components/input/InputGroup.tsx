@@ -10,25 +10,14 @@ type InputGroupProps = {
   buttonIcon?: JSX.Element;
 } & React.InputHTMLAttributes<HTMLInputElement>;
 
-const InputGroup = ({
-  id,
-  label,
-  register,
-  errorMessage,
-  buttonClick,
-  buttonIcon,
-  buttonText,
-  ...props
-}: InputGroupProps) => {
+const InputGroup = ({ id, label, register, errorMessage, buttonClick, buttonIcon, buttonText, ...props }: InputGroupProps) => {
   const isInputError = !!errorMessage;
   return (
     <div className="relative">
       <div className="flex flex-row">
         <label
           htmlFor={id}
-          className={`absolute -top-2 left-2 inline-block bg-white px-1 text-xs font-medium text-gray-900 ${
-            isInputError ? "text-red-500" : ""
-          }`}
+          className={`absolute -top-2 left-2 inline-block bg-white px-1 text-xs font-medium text-gray-900 ${isInputError ? "text-red-500" : ""}`}
         >
           {label}
         </label>
@@ -55,7 +44,9 @@ const InputGroup = ({
         )}
       </div>
       {errorMessage && (
-        <span className="text-xs text-red-500">{errorMessage}</span>
+        <span data-testid={`${id}-inputErrorMessage`} className="text-xs text-red-500">
+          {errorMessage}
+        </span>
       )}
     </div>
   );
