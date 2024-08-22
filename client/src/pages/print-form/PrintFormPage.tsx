@@ -14,6 +14,7 @@ import { startBatch } from "@/services/batchService";
 import AlertBanner from "@/components/banner/AlertBanner";
 import { Product } from "@/types/product";
 import FullPageLoading from "@/components/FullPageLoading";
+import * as UniquecodeServices from "@/services/uniquecodeService";
 
 const connectedPrinter = [1000012];
 // const connectedPrinter = [1000012, 1000013];
@@ -23,7 +24,7 @@ const connectedPrinter = [1000012];
 const PrintDataSchema = z.object({
   batchs: z.array(
     z.object({
-      availableCount: z.number(),
+      // availableCount: z.number(),
       batchNo: z
         .string()
         .min(1, { message: "Batch Number is Required" })
@@ -71,7 +72,7 @@ const PrintFormPage = () => {
       batchs: connectedPrinter.map(() => ({
         batchNo: "",
         productName: "",
-        availableCount: 0,
+        // availableCount: 0,
         // productId: 0,
         // printEstimate: 0,
         // barcode: "",
@@ -134,17 +135,19 @@ const PrintFormPage = () => {
     }
   };
   const getAvailableQuantity = async () => {
+    console.log("Get Available Quantity");
     setIsLoading(true);
 
-    // ! FOR TESTING
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const response = await UniquecodeServices.getAvailableUniquecodes();
 
-    const availableQuantity = await Promise.resolve(1000);
-    setAvailableQuantity(availableQuantity);
-    // clearErrors(`batchs.${index}.availableCount`);
-    // setValue(`batchs.${index}.availableCount`, availableQuantity);
-    // setValue("availableCount", availableQuantity);
     setIsLoading(false);
+
+    if (!response.success) {
+      setAlertMessage(response.message ?? "Failed to get available quantity");
+      return;
+    }
+
+    setAvailableQuantity(response.data.count);
   };
 
   return (
@@ -177,6 +180,8 @@ const PrintFormPage = () => {
               readOnly
               buttonClick={() => getAvailableQuantity()}
               buttonIcon={<ArrowPathIcon className="size-6" />}
+              className="focus:ring-blue-300"
+              buttonClass="bg-emerald-600 hover:bg-emerald-500"
             />
           </div>
 
@@ -212,6 +217,7 @@ const PrintFormPage = () => {
                     label="Batch Number"
                     id={`batchNo-${index}`}
                     type="text"
+                    className="focus:ring-blue-300"
                     errorMessage={errors?.batchs?.[index]?.batchNo?.message}
                     onChange={(e) =>
                       setValue(
@@ -226,11 +232,13 @@ const PrintFormPage = () => {
                     label="Product"
                     id={`productName-${index}`}
                     type="text"
+                    className="focus:ring-blue-300"
                     readOnly
                     errorMessage={errors?.batchs?.[index]?.productName?.message}
                     // buttonClick={() => getProduct(index)}
                     buttonClick={() => setShowProductModal(true)}
                     buttonText="SCAN"
+                    buttonClass="bg-emerald-600 hover:bg-emerald-500"
                   />
 
                   {/* <InputGroup
@@ -254,6 +262,7 @@ const PrintFormPage = () => {
                     label="Estimate Quantity"
                     id={`printEstimate-${index}`}
                     type="text"
+                    className="focus:ring-blue-300"
                     errorMessage={
                       errors?.batchs?.[index]?.printEstimate?.message
                     }
@@ -265,7 +274,7 @@ const PrintFormPage = () => {
           <button
             data-testid="startBatch-button"
             type="submit"
-            className="w-full max-w-md self-center flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            className="w-full max-w-md self-center flex justify-center rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
           >
             Start Batch
           </button>

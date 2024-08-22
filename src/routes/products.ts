@@ -1,7 +1,5 @@
 import express from "express";
-import db from "../db";
 import { getProductByBarcode } from "../services/product";
-import { sleep } from "../utils/helper";
 
 const productRoutes = express.Router();
 
@@ -25,7 +23,6 @@ productRoutes.post("/", async (req, res) => {
 productRoutes.get("/:barcode", async (req, res) => {
   try {
     const product = await getProductByBarcode(req.params.barcode);
-    await sleep(10000);
     if (!product) {
       return res.status(404).json({
         success: false,
