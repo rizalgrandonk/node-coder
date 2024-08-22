@@ -26,7 +26,7 @@ const InputGroup = ({
 }: InputGroupProps) => {
   const isInputError = !!errorMessage;
   return (
-    <div className="relative">
+    <div className="relative flex flex-col gap-1">
       <div className="flex flex-row">
         <label
           htmlFor={id}
@@ -64,13 +64,15 @@ const InputGroup = ({
           </button>
         )}
       </div>
-      {errorMessage && (
+      {errorMessage ? (
         <span
           data-testid={`${id}-inputErrorMessage`}
-          className="text-xs text-red-500"
+          className="text-xs text-red-500 px-1"
         >
           {errorMessage}
         </span>
+      ) : (
+        <div className="h-4" />
       )}
     </div>
   );

@@ -15,6 +15,7 @@ import AlertBanner from "@/components/banner/AlertBanner";
 import { Product } from "@/types/product";
 import FullPageLoading from "@/components/FullPageLoading";
 import * as UniquecodeServices from "@/services/uniquecodeService";
+import { cn } from "@/utils/helper";
 
 const connectedPrinter = [1000012];
 // const connectedPrinter = [1000012, 1000013];
@@ -97,6 +98,7 @@ const PrintFormPage = () => {
         barcode: item.barcode,
         printEstimate: item.printEstimate,
         productId: item.productId,
+        productName: item.productName,
       })),
     };
     const createdBatchResponse = await startBatch(createdBatchRequest);
@@ -165,13 +167,13 @@ const PrintFormPage = () => {
 
         <form
           onSubmit={handleSubmit(formSubmitHandler)}
-          className="bg-white space-y-4 flex flex-col gap-4 p-4 rounded-lg shadow-md "
+          className="bg-white flex flex-col gap-4 p-4 rounded-lg shadow-md "
         >
           <div className="flex">
             <h1 className="text-3xl font-bold">Batch Form</h1>
           </div>
 
-          <div className="flex flex-col max-w-sm">
+          <div className="flex flex-col max-w-sm pt-4">
             <InputGroup
               label="Available Quantity"
               id="availableUniquecodeCount"
@@ -186,9 +188,10 @@ const PrintFormPage = () => {
           </div>
 
           <div
-            className={`grid grid-cols-1 ${
-              fields.length >= 2 ? "lg:grid-cols-2" : ""
-            } gap-8`}
+            className={cn(
+              "grid gap-8",
+              fields.length >= 2 ? "lg:grid-cols-2" : "grid-cols-1"
+            )}
           >
             {fields.map((item, index) => (
               <div
@@ -210,7 +213,7 @@ const PrintFormPage = () => {
 
                 <div
                   key={item.id}
-                  className="flex-grow space-y-6 px-12 py-4 gap-4 m-auto"
+                  className="flex-grow space-y-5 px-10 py-4 m-auto"
                 >
                   <InputGroup
                     register={register(`batchs.${index}.batchNo`)}
@@ -241,20 +244,6 @@ const PrintFormPage = () => {
                     buttonClass="bg-emerald-600 hover:bg-emerald-500"
                   />
 
-                  {/* <InputGroup
-                    register={register(`batchs.${index}.availableCount`, {
-                      valueAsNumber: true,
-                    })}
-                    label="Available Quantity"
-                    id="availableCount"
-                    type="text"
-                    readOnly
-                    errorMessage={
-                      errors?.batchs?.[index]?.availableCount?.message
-                    }
-                    buttonClick={() => getAvailableQuantity(index)}
-                  /> */}
-
                   <InputGroup
                     register={register(`batchs.${index}.printEstimate`, {
                       valueAsNumber: true,
@@ -274,7 +263,7 @@ const PrintFormPage = () => {
           <button
             data-testid="startBatch-button"
             type="submit"
-            className="w-full max-w-md self-center flex justify-center rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+            className="w-full max-w-md self-center flex justify-center rounded-md bg-emerald-600 px-4 py-2.5 text-base font-semibold leading-6 text-white shadow-sm hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 transition-all"
           >
             Start Batch
           </button>

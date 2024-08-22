@@ -11,7 +11,7 @@ import { DatabaseThread } from "./threads/databaseThread";
 import { PrinterThread } from "./threads/printerThread";
 import * as ActionBatch from "./actions/batch";
 import path from "path";
-import { Batch } from "./types/data";
+import { Batch, Product } from "./types/data";
 import { z } from "zod";
 import { zodErrorMap } from "./utils/zod";
 import cors from "cors";
@@ -62,11 +62,11 @@ const DBUpdateQueue = new SharedQueue(MAX_QUEUE * 2);
 let databaseThread: Awaited<ReturnType<typeof spawn<DatabaseThread>>>;
 let printerThread: Awaited<ReturnType<typeof spawn<PrinterThread>>>;
 
-let batchInfo: Batch | null = null;
+let batchInfo: (Batch & { product: Product }) | null = null;
 
 // let printProcess: Promise<void>;
 
-const startBatch = async (info: Batch) => {
+const startBatch = async (info: Batch & { product: Product }) => {
   batchInfo = info;
 
   printedUpdateCount.set(0);
@@ -100,6 +100,8 @@ const startBatch = async (info: Batch) => {
     isPrinterFinishedBuffer: isPrinterFinished.getBuffer(),
     batchInfo,
   });
+
+  io.emit("batchInfo", batchInfo);
 };
 
 const startPrintProcess = async () => {
@@ -253,35 +255,37 @@ const startPrintProcess = async () => {
 io.on("connection", (socket) => {
   console.log("Connected", socket.id);
 
+  socket.emit("batchInfo", batchInfo);
+
   socket.on("disconnect", () => {
     console.log("Disconnect", socket.id);
   });
 
-  socket.on("startPrint", () => {
-    console.log("Start Print Called");
-    startPrintProcess();
-  });
+  // // socket.on("startPrint", () => {
+  // //   console.log("Start Print Called");
+  // //   startPrintProcess();
+  // // });
 
-  socket.on("stopPrint", () => {
-    console.log("Stop Print Called");
-    isPrinting.set(false);
-  });
+  // // socket.on("stopPrint", () => {
+  // //   console.log("Stop Print Called");
+  // //   isPrinting.set(false);
+  // // });
 
-  socket.on("stopBatch", async () => {
-    if (isPrinting.get()) {
-      console.log("Stop Batch Called");
-      return;
-    }
+  // // socket.on("stopBatch", async () => {
+  // //   if (isPrinting.get()) {
+  // //     console.log("Stop Batch Called");
+  // //     return;
+  // //   }
 
-    if (databaseThread) {
-      await Thread.terminate(databaseThread);
-    }
-    if (printerThread) {
-      await Thread.terminate(printerThread);
-    }
+  // //   if (databaseThread) {
+  // //     await Thread.terminate(databaseThread);
+  // //   }
+  // //   if (printerThread) {
+  // //     await Thread.terminate(printerThread);
+  // //   }
 
-    batchInfo = null;
-  });
+  // //   batchInfo = null;
+  // });
 });
 
 app.use(express.json());
@@ -400,6 +404,8 @@ app.post("/batch/stop", async (req: Request, res) => {
     }
 
     batchInfo = null;
+
+    io.emit("batchInfo", null);
 
     return res.status(200).json({ success: true, message: "Success" });
   } catch (error: any) {

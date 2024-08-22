@@ -7,6 +7,7 @@ type StartBatchRequest = {
     barcode: string;
     printEstimate: number;
     productId: number;
+    productName: string;
   }[];
 };
 
