@@ -1,54 +1,39 @@
 import { useState } from "react";
-import type { Product } from "@/types/product";
-
+import * as ProductService from "@/services/productService";
+// import { sleep } from "@/utils/helper";
 export const usePrintFormModal = () => {
   const [showProductModal, setShowProductModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const getProductByBarcode = async (barcode: string) => {
     console.log("getProductByBarcode", barcode);
-    const product: Product = {
-      name: "SGM EKSPLOR SOYA MADU 400G",
-      // received: "",
-      // description: null,
-      upc: "8999099923548",
-      maxbuffer: 0,
-      localminlevel: 0,
-      localmaxlevel: 0,
-      codekey: "SGMES400M",
-      endqueue: 0,
-      availableqty: 0,
-      isactive: true,
-      id: 1000068,
-      cardboardwidth: 278,
-      cardboardlength: 0,
-      widthallowance: 10,
-    };
+    setIsLoading(true);
+    // await sleep(1000);
 
-    /**
-     * 
-     * name:SGM EKSPLOR SOYA MADU 400G
-        received:
-        description:
-        upc:8999099923548
-        maxbuffer:0
-        localminlevel:0
-        localmaxlevel:0
-        codekey:SGMES400M
-        endqueue:0
-        availableqty:0
-        isactive:true
-        id:1000068
-        cardboardwidth:278
-        cardboardlength:0
-        widthallowance:10
-     */
+    const response = await ProductService.getByBarcode(barcode);
+    console.log(response);
+    if (!response.success) {
+      setError(response.message ?? "Failed to get product data");
+      setIsLoading(false);
+      return null;
+    }
 
-    return product;
+    setError(null);
+    setIsLoading(false);
+    return response.data;
+  };
+
+  const clearError = () => {
+    setError(null);
   };
 
   return {
     showProductModal,
     setShowProductModal,
     getProductByBarcode,
+    isLoading,
+    error,
+    clearError,
   };
 };

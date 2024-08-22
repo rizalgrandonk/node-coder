@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import type { Mock } from "vitest";
 import * as BatchService from "@/services/batchService";
+import * as ProductService from "@/services/productService";
 import { usePrintData } from "@/context/print";
 
 // Mock useNavigate
@@ -36,8 +37,18 @@ describe("PrintFormPage", () => {
     vi.clearAllMocks();
 
     (usePrintData as Mock).mockReturnValue(mockPrintDataContext);
-    vi.spyOn(BatchService, "startBatch").mockResolvedValue({ success: true });
-    vi.spyOn(BatchService, "stopBatch").mockResolvedValue({ success: true });
+    vi.spyOn(BatchService, "startBatch").mockResolvedValue({
+      success: true,
+      data: { id: 1 },
+    } as any);
+    vi.spyOn(BatchService, "stopBatch").mockResolvedValue({
+      success: true,
+      data: { id: 1 },
+    } as any);
+    vi.spyOn(ProductService, "getByBarcode").mockResolvedValue({
+      success: true,
+      data: { id: 1, name: "TEST", upc: "Barcode" },
+    } as any);
   });
 
   it("should handle Start Batch button click", async () => {
@@ -55,7 +66,21 @@ describe("PrintFormPage", () => {
     await userEvent.type(batchNoInput, "BATCH-1");
     await userEvent.type(estimateQuantityInput, "100");
 
-    await userEvent.click(scanProductButtons);
+    await userEvent.click(scanProductButtons); // click open product modal lookup (scan)
+
+    const barcodeInput = screen.getByLabelText("BARCODE");
+    const modalLookupSubmitButton = screen.getByTestId(
+      "submitModalLookupProduct-button"
+    );
+
+    expect(barcodeInput).toBeInTheDocument();
+
+    await userEvent.type(barcodeInput, "100");
+
+    await userEvent.click(modalLookupSubmitButton);
+
+    expect(barcodeInput).not.toBeInTheDocument();
+
     await userEvent.click(startBatchButtons);
 
     expect(BatchService.startBatch).toHaveBeenCalled();
@@ -69,7 +94,9 @@ describe("PrintFormPage", () => {
       </MemoryRouter>
     );
 
-    const getUniqueCodeCountButtons = screen.getByTestId("availableUniquecodeCount-button");
+    const getUniqueCodeCountButtons = screen.getByTestId(
+      "availableUniquecodeCount-button"
+    );
     userEvent.click(getUniqueCodeCountButtons);
     expect(getUniqueCodeCountButtons).toBeTruthy();
   });
@@ -86,8 +113,12 @@ describe("PrintFormPage", () => {
     await userEvent.type(batchNoInput, "BATCH 1");
     await userEvent.click(startBatchButtons);
 
-    const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
-    expect(batchNoInputErrorMessage.textContent).toEqual("Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed.");
+    const batchNoInputErrorMessage = screen.getByTestId(
+      "batchNo-0-inputErrorMessage"
+    );
+    expect(batchNoInputErrorMessage.textContent).toEqual(
+      "Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed."
+    );
   });
 
   it("should display error when Input BatchNo With Symbol Except Dash (-) & Slash (/)", async () => {
@@ -102,8 +133,12 @@ describe("PrintFormPage", () => {
     await userEvent.type(batchNoInput, "BATCH#1");
     await userEvent.click(startBatchButtons);
 
-    const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
-    expect(batchNoInputErrorMessage.textContent).toEqual("Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed.");
+    const batchNoInputErrorMessage = screen.getByTestId(
+      "batchNo-0-inputErrorMessage"
+    );
+    expect(batchNoInputErrorMessage.textContent).toEqual(
+      "Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed."
+    );
   });
 
   it("should transform Text To Uppercase when Insert BatchNo with Lowercase", async () => {
@@ -136,8 +171,12 @@ describe("PrintFormPage", () => {
     );
     await userEvent.click(startBatchButtons);
 
-    const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
-    expect(batchNoInputErrorMessage.textContent).toEqual("String must contain at most 255 character(s)");
+    const batchNoInputErrorMessage = screen.getByTestId(
+      "batchNo-0-inputErrorMessage"
+    );
+    expect(batchNoInputErrorMessage.textContent).toEqual(
+      "String must contain at most 255 character(s)"
+    );
   });
 
   it("should display error when Submit Batch without Input BatchNo", async () => {
@@ -152,8 +191,12 @@ describe("PrintFormPage", () => {
     await userEvent.clear(batchNoInput);
     await userEvent.click(startBatchButtons);
 
-    const batchNoInputErrorMessage = screen.getByTestId("batchNo-0-inputErrorMessage");
-    expect(batchNoInputErrorMessage.textContent).toEqual("Batch Number is Required");
+    const batchNoInputErrorMessage = screen.getByTestId(
+      "batchNo-0-inputErrorMessage"
+    );
+    expect(batchNoInputErrorMessage.textContent).toEqual(
+      "Batch Number is Required"
+    );
   });
 
   it("should display error when Submit Batch without Input Product", async () => {
@@ -166,7 +209,9 @@ describe("PrintFormPage", () => {
     const startBatchButtons = screen.getByTestId("startBatch-button");
     await userEvent.click(startBatchButtons);
 
-    const productInputErrorMessage = screen.getByTestId("productName-0-inputErrorMessage");
+    const productInputErrorMessage = screen.getByTestId(
+      "productName-0-inputErrorMessage"
+    );
     expect(productInputErrorMessage.textContent).toEqual("Product is Required");
   });
 
@@ -182,12 +227,19 @@ describe("PrintFormPage", () => {
     await userEvent.clear(printEstimateInput);
     await userEvent.click(startBatchButtons);
 
-    const printEstimateInputErrorMessage = screen.getByTestId("printEstimate-0-inputErrorMessage");
-    expect(printEstimateInputErrorMessage.textContent).toEqual("Estimate Quantity is Required and should be numeric and not containing symbol");
+    const printEstimateInputErrorMessage = screen.getByTestId(
+      "printEstimate-0-inputErrorMessage"
+    );
+    expect(printEstimateInputErrorMessage.textContent).toEqual(
+      "Estimate Quantity is Required and should be numeric value without symbol"
+    );
   });
 
   it("should display error when Estimate Quantity More Than Available Quantity", async () => {
-    vi.spyOn(BatchService, "startBatch").mockResolvedValue({ success: false, message: "Estimate Quantity Shouldn't higher than Available Quantity" });
+    vi.spyOn(BatchService, "startBatch").mockResolvedValue({
+      success: false,
+      message: "Estimate Quantity Shouldn't higher than Available Quantity",
+    });
     render(
       <MemoryRouter>
         <PrintFormPage />
@@ -203,12 +255,23 @@ describe("PrintFormPage", () => {
     await userEvent.type(estimateQuantityInput, "100");
 
     await userEvent.click(scanProductButtons);
+
+    const barcodeInput = screen.getByLabelText("BARCODE");
+    const modalLookupSubmitButton = screen.getByTestId(
+      "submitModalLookupProduct-button"
+    );
+
+    await userEvent.type(barcodeInput, "100");
+
+    await userEvent.click(modalLookupSubmitButton);
     await userEvent.click(startBatchButtons);
 
     expect(BatchService.startBatch).toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
 
     const errorAlert = screen.getByTestId("alert-text");
-    expect(errorAlert.textContent).toEqual("Estimate Quantity Shouldn't higher than Available Quantity");
+    expect(errorAlert.textContent).toEqual(
+      "Estimate Quantity Shouldn't higher than Available Quantity"
+    );
   });
 });

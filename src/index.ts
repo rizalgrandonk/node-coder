@@ -71,8 +71,12 @@ const startBatch = async (info: Batch) => {
 
   printedUpdateCount.set(0);
 
-  databaseThread = await spawn<DatabaseThread>(new ThreadWorker("./threads/databaseThread"));
-  printerThread = await spawn<PrinterThread>(new ThreadWorker("./threads/printerThread"));
+  databaseThread = await spawn<DatabaseThread>(
+    new ThreadWorker("./threads/databaseThread")
+  );
+  printerThread = await spawn<PrinterThread>(
+    new ThreadWorker("./threads/printerThread")
+  );
 
   await databaseThread.init({
     isPrintBuffer: isPrinting.getBuffer(),
@@ -283,7 +287,8 @@ io.on("connection", (socket) => {
 app.use(express.json());
 app.use(cors());
 app.use(async (req: Request, res, next) => {
-  const ipString = req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? req.ip;
+  const ipString =
+    req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? req.ip;
   const userAgent = req.headers["user-agent"];
   const ip = parseIP(ipString?.toString());
 
@@ -309,7 +314,9 @@ app.post("/batch/start", async (req: Request, res) => {
 
     startBatch(batch);
 
-    return res.status(200).json({ data: batch, message: "Success", success: true });
+    return res
+      .status(200)
+      .json({ data: batch, message: "Success", success: true });
   } catch (error: any) {
     console.log("Error start batch", error);
     const statusCode = error?.statusCode ?? 500;
@@ -331,7 +338,7 @@ app.post("/print/start", async (req: Request, res) => {
   });
 
   startPrintProcess();
-  return res.status(200).json({ message: "Success" });
+  return res.status(200).json({ success: true, message: "Success" });
 });
 
 app.post("/print/stop", async (req: Request, res) => {
@@ -347,7 +354,7 @@ app.post("/print/stop", async (req: Request, res) => {
   });
 
   isPrinting.set(false);
-  return res.status(200).json({ message: "Success" });
+  return res.status(200).json({ success: true, message: "Success" });
 });
 
 app.post("/batch/stop", async (req: Request, res) => {
@@ -394,7 +401,7 @@ app.post("/batch/stop", async (req: Request, res) => {
 
     batchInfo = null;
 
-    return res.status(200).json({ message: "Success" });
+    return res.status(200).json({ success: true, message: "Success" });
   } catch (error: any) {
     console.log("Error stop batch", error);
     const statusCode = error?.statusCode ?? 500;

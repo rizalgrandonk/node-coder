@@ -8,10 +8,21 @@ import env from "@/configs/env";
  * @param options - Optional configurations such as method, headers, and body.
  * @returns A promise that resolves to an object containing success status and either data or an error message.
  */
+
+type Response<T> =
+  | {
+      success: true;
+      data: T;
+      message: string;
+    }
+  | {
+      success: false;
+      message: string;
+    };
 const fetchRequest = async <T>(
   path: string,
   options?: RequestInit
-): Promise<{ success: boolean; data?: T; message?: string }> => {
+): Promise<Response<T>> => {
   try {
     const url = `${env.VITE_APP_SERVER_URL}${path}`;
     const response = await fetch(url, {
@@ -21,23 +32,22 @@ const fetchRequest = async <T>(
       },
       signal: AbortSignal.timeout(Number(env.VITE_APP_SERVER_REQUEST_TIMEOUT)),
     });
+
     const data = await response.json();
 
     if (!response.ok) {
       return {
         success: false,
-        message: data.message || "An error occurred.",
+        message: data?.message ?? "An error occurred.",
       };
     }
 
-    return {
-      success: true,
-      data,
-    };
-  } catch (error: unknown) {
+    return data;
+  } catch (error: any) {
+    console.log("Failed Request", error);
     return {
       success: false,
-      message: (error as Error).message || "Network error",
+      message: "An error occurred.",
     };
   }
 };

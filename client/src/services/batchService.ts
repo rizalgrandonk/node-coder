@@ -9,14 +9,11 @@ type StartBatchRequest = {
     productId: number;
   }[];
 };
-type StartBatchResponse = {
-  data: Batch;
-};
 
 export const startBatch = async (data: StartBatchRequest) => {
   const path = "/batch/start";
   const method = "POST";
-  const response = await fetchRequest<StartBatchResponse>(path, {
+  const response = await fetchRequest<Batch>(path, {
     method,
     body: JSON.stringify(data),
   });

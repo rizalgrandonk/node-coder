@@ -1,79 +1,81 @@
+import { useState } from "react";
+import InputGroup from "@/components/input/InputGroup";
 import Modal from "@/components/modal/Modal";
-import { Dispatch, SetStateAction } from "react";
+import { usePrintFormModal } from "../hooks/usePrintFormModal";
+import { Product } from "@/types/product";
+import FullPageLoading from "@/components/FullPageLoading";
+import AlertBanner from "@/components/banner/AlertBanner";
 
 type ModalLookupProductProps = {
   showModal: boolean;
-  setShowModal: Dispatch<SetStateAction<boolean>>;
-  onSubmit: (data: any) => void;
+  onSubmit: (product: Product) => void;
+  onClose: () => void;
 };
 
-const ModalLookupProduct = ({ showModal, setShowModal }: ModalLookupProductProps) => {
+const ModalLookupProduct = ({
+  showModal,
+  onSubmit,
+  onClose,
+}: ModalLookupProductProps) => {
+  console.log("ModalLookupProduct Re-Render");
+  // 8999099923548
+  const [barcode, setBarcode] = useState("");
+  const { getProductByBarcode, error, clearError, isLoading } =
+    usePrintFormModal();
+  const handleConfirmButtonClick = async () => {
+    const product = await getProductByBarcode(barcode);
+    console.log({ product });
+    if (!product) {
+      console.log("Product not found");
+      return;
+    }
+    onSubmit(product);
+  };
+
+  const handleCloseButtonClick = () => {
+    // setBarcode("");
+    onClose();
+  };
   return (
-    <Modal
-      size="lg"
-      showModal={showModal}
-      onClose={() => setShowModal}
-      title="SCAN PRODUCT"
-      footer={
-        <>
-          <button
-            className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
-            type="button"
-            onClick={() => setShowModal(false)}
-          >
-            Close
-          </button>
-          <button
-            className="bg-emerald-500 text-white active:bg-emerald-600 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
-            type="button"
-            onClick={() => setShowModal(false)}
-          >
-            Save Changes
-          </button>
-        </>
-      }
-    >
-      <div className="my-4 min-w-48 text-blueGray-500 text-lg leading-relaxed">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
-            BARCODE
-          </label>
-          <div className="my-2 flex flex-row">
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            />
+    <>
+      {isLoading && <FullPageLoading />}
+      <Modal
+        size="lg"
+        showModal={showModal}
+        onClose={() => onClose()}
+        title="SCAN PRODUCT"
+        footer={
+          <div className="flex flex-row justify-end border-t border-solid border-slate-200 rounded-b p-2">
+            <button
+              data-testid="submitModalLookupProduct-button"
+              className="bg-emerald-500 text-white active:bg-emerald-600 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+              type="button"
+              onClick={handleConfirmButtonClick}
+            >
+              Confirm
+            </button>
+            <button
+              data-testid="closeModalLookupProduct-button"
+              className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+              type="button"
+              onClick={handleCloseButtonClick}
+            >
+              Close
+            </button>
           </div>
+        }
+      >
+        {error && <AlertBanner message={error} onClose={clearError} />}
+        <div className="py-4 min-w-48 text-blueGray-500 text-lg leading-relaxed ">
+          <InputGroup
+            id="lookup-barcode"
+            label="BARCODE"
+            placeholder="Please Type Product Barcode"
+            onChange={(e) => setBarcode(e.target.value)}
+          />
         </div>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className="rounded-md border border-gray-300 bg-white py-1.5 px-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-          >
-            Clear
-          </button>
-        </div>
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
-            PRODUCT
-          </label>
-          <div className="my-2 flex flex-row">
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            />
-          </div>
-        </div>
-      </div>
-    </Modal>
+      </Modal>
+    </>
   );
 };
 
