@@ -1,5 +1,17 @@
 import db from "../db";
 
+/**
+ * Creates a new user activity record in the database.
+ *
+ * @param {object} data - An object containing the user activity data.
+ * @param {string} data.actiontype - The type of action performed by the user.
+ * @param {number} data.userid - The ID of the user who performed the action.
+ * @param {Date} [data.timestamp] - The timestamp of the action (defaults to the current date and time).
+ * @param {string} [data.ip] - The IP address of the user (defaults to null).
+ * @param {string} [data.browser] - The browser used by the user (defaults to null).
+ * @param {number} [data.markingprinterid] - The ID of the marking printer (defaults to 9999).
+ * @return {object|null} The newly created user activity record, or null if the record was not created.
+ */
 export const createUserActivity = async (data: {
   actiontype: string;
   timestamp?: Date;

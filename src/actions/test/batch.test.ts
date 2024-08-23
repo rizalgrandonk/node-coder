@@ -117,6 +117,7 @@ describe("Start Batch", () => {
 });
 
 describe("Stop Batch", () => {
+  // Define a valid batch object for use in tests
   const validBatch = {
     id: 2055,
     userId: 1000000,
@@ -133,36 +134,54 @@ describe("Stop Batch", () => {
   };
 
   beforeEach(() => {
+    // Clear all mocks before each test to prevent state leakage between tests
     jest.clearAllMocks();
+
+    // Mock the updateBatch function to always resolve with a valid batch object
     (updateBatch as jest.Mock).mockResolvedValue(validBatch);
+
+    // Mock the findById function to always resolve with a valid batch object
     (findById as jest.Mock).mockResolvedValue(validBatch);
   });
 
   it("should update batch successfully", async () => {
+    // Call endBatch with a valid batch and expect it to return the same batch
     const result = await endBatch({ batchs: [validBatch] });
     expect(result).toEqual(validBatch);
   });
 
   it("should throw a validation error if required fields are missing", async () => {
+    // Create an invalid batch object with a missing 'id' field
     const invalidBatch = { ...validBatch, id: undefined };
+
+    // Call endBatch with the invalid batch and expect it to throw an ApiError with a specific message
     await expect(endBatch({ batchs: [invalidBatch] })).rejects.toThrow(ApiError);
     await expect(endBatch({ batchs: [invalidBatch] })).rejects.toThrow("Empty Mandatory Parameter (batchs.0.id)");
   });
 
   it("should throw an error if batch is not found", async () => {
+    // Mock the findById function to return undefined, simulating a "not found" scenario
     (findById as jest.Mock).mockResolvedValue(undefined);
+
+    // Call endBatch with a valid batch and expect it to throw an ApiError with a specific message
     await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow(ApiError);
     await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow("Batch not found");
   });
 
   it("should throw an error if batch is not active", async () => {
+    // Mock the findById function to return a batch with 'isactive' set to false
     (findById as jest.Mock).mockResolvedValue({ ...validBatch, isactive: false });
+
+    // Call endBatch with a valid batch and expect it to throw an ApiError with a specific message
     await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow(ApiError);
     await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow("Batch is not active");
   });
 
   it("should throw an error if update batch fails", async () => {
+    // Mock the updateBatch function to return undefined, simulating a failure to update
     (updateBatch as jest.Mock).mockResolvedValue(undefined);
+
+    // Call endBatch with a valid batch and expect it to throw an ApiError with a specific message
     await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow(ApiError);
     await expect(endBatch({ batchs: [validBatch] })).rejects.toThrow("Failed to update batch");
   });

@@ -3,23 +3,11 @@ import { getProductByBarcode } from "../services/product";
 
 const productRoutes = express.Router();
 
-productRoutes.post("/", async (req, res) => {
-  try {
-    // const product = await prisma.product.create({
-    //   data: {
-    //     name: req.body.name,
-    //     codekey: req.body.codekey,
-    //   },
-    // });
-    return res.status(200).json({});
-  } catch (error: any) {
-    if (error.message) {
-      return res.status(400).json({ message: error.message });
-    }
-    return res.status(400).json(error);
-  }
-});
-
+/**
+ * Get product by barcode
+ * @param {string} req.params.barcode
+ * @returns {object} product
+ */
 productRoutes.get("/:barcode", async (req, res) => {
   try {
     const product = await getProductByBarcode(req.params.barcode);

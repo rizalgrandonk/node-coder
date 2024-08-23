@@ -10,6 +10,12 @@ type CodeErrorLogType = {
   created?: Date;
 };
 
+/**
+ * Inserts an error log into the database.
+ *
+ * @param {CodeErrorLogType} params - The error log details to be inserted.
+ * @return {number} The number of rows affected by the insert operation.
+ */
 export const insertErrorLog = async (params: CodeErrorLogType) => {
   const {
     markingprinterid = 9999,
@@ -30,15 +36,7 @@ export const insertErrorLog = async (params: CodeErrorLogType) => {
       $1, $2, $3, $4, $5, $6, $7)
   `;
 
-  const result = await db.query(query, [
-    errormessage,
-    errorTimestamp,
-    batchno,
-    sendconfirmed,
-    batchid,
-    markingprinterid,
-    created,
-  ]);
+  const result = await db.query(query, [errormessage, errorTimestamp, batchno, sendconfirmed, batchid, markingprinterid, created]);
 
   return result.rowCount;
 };

@@ -3,33 +3,15 @@ import db from "../db";
 import { getAvailableUniquecodes } from "../services/uniquecodes";
 const uniquecodeRoutes = express.Router();
 
-uniquecodeRoutes.get("/", async (req, res) => {
-  const limit = +(req.query.limit?.toString() ?? 10);
-  try {
-    // const uniquecodes = await prisma.uniquecode.findMany({
-    //   orderBy: {
-    //     id: "asc",
-    //   },
-    //   take: limit,
-    //   include: {
-    //     product: true,
-    //   },
-    // });
-    return res.status(200).send({});
-  } catch (error: any) {
-    if (error.message) {
-      return res.status(400).send({ message: error.message });
-    }
-    return res.status(400).send(error);
-  }
-});
-
+/**
+ * Get the available count of uniquecodes in the database.
+ * @route GET /uniquecodes/available-count
+ * @returns {object} - A JSON object containing the available count of uniquecodes.
+ */
 uniquecodeRoutes.get("/available-count", async (req, res) => {
   try {
     const availableUniquecodeCount = await getAvailableUniquecodes();
-    return res
-      .status(200)
-      .send({ data: { count: availableUniquecodeCount }, success: true });
+    return res.status(200).send({ data: { count: availableUniquecodeCount }, success: true });
   } catch (error: any) {
     const statusCode = error?.statusCode ?? 500;
     const message = error?.message ?? "Something went wrong";
