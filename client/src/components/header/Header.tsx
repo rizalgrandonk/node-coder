@@ -28,7 +28,10 @@ const Header = () => {
       className={cn(`bg-pastel-blue-100 p-4 flex justify-between items-center shadow-md transition-transform duration-300`, isFullScreen ? "hidden" : "")}
     >
       {/* Title */}
-      <h1 className="text-xl font-bold text-pastel-blue-700">Smile Coder</h1>
+      <div className="flex items-center gap-3">
+        <img src="/android-chrome-512x512.png" alt="Logo" className="w-10 aspect-square object-contain" />
+        <h1 className="text-xl font-bold text-pastel-blue-700">Smile Coder</h1>
+      </div>
 
       {/* User Profile */}
       <div className="flex items-center space-x-4">

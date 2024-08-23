@@ -1,6 +1,7 @@
 // utils/fetch.ts
 
 import env from "@/configs/env";
+
 /**
  * Makes an HTTP request using the Fetch.
  *
@@ -19,10 +20,7 @@ type Response<T> =
       success: false;
       message: string;
     };
-const fetchRequest = async <T>(
-  path: string,
-  options?: RequestInit
-): Promise<Response<T>> => {
+const fetchRequest = async <T>(path: string, options?: RequestInit): Promise<Response<T>> => {
   try {
     const url = `${env.VITE_APP_SERVER_URL}${path}`;
     const response = await fetch(url, {
@@ -45,6 +43,12 @@ const fetchRequest = async <T>(
     return data;
   } catch (error: any) {
     console.log("Failed Request", error);
+    if (error.toString().includes("signal timed out")) {
+      return {
+        success: false,
+        message: "Connection Timeout: Unable to retrieve data. Please try again.",
+      };
+    }
     return {
       success: false,
       message: "An error occurred.",

@@ -31,13 +31,11 @@ const PrintDataSchema = z.object({
         .min(1, { message: "Batch Number is Required" })
         .max(255)
         .regex(/^[A-Z0-9\-\/]+$/, {
-          message:
-            "Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed.",
+          message: "Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed.",
         }),
       printEstimate: z
         .number({
-          message:
-            "Estimate Quantity is Required and should be numeric value without symbol",
+          message: "Estimate Quantity is Required and should be numeric value without symbol",
         })
         .int("Estimate Quantity should be numeric value without symbol")
         .gte(1),
@@ -158,17 +156,12 @@ const PrintFormPage = () => {
       <Header />
 
       <div className="min-h-screen p-3 bg-slate-200 text-gray-900">
-        {alertMessage && (
-          <AlertBanner
-            message={alertMessage}
-            onClose={() => setAlertMessage("")}
-          />
-        )}
-
         <form
           onSubmit={handleSubmit(formSubmitHandler)}
-          className="bg-white flex flex-col gap-4 p-4 rounded-lg shadow-md "
+          className={cn("bg-white flex flex-col gap-4 p-4 rounded-lg shadow-md", fields.length < 2 ? "max-w-5xl mx-auto" : "")}
         >
+          {alertMessage && <AlertBanner message={alertMessage} onClose={() => setAlertMessage("")} />}
+
           <div className="flex">
             <h1 className="text-3xl font-bold">Batch Form</h1>
           </div>
@@ -187,17 +180,9 @@ const PrintFormPage = () => {
             />
           </div>
 
-          <div
-            className={cn(
-              "grid gap-8",
-              fields.length >= 2 ? "lg:grid-cols-2" : "grid-cols-1"
-            )}
-          >
+          <div className={cn("grid gap-8", fields.length >= 2 ? "lg:grid-cols-2" : "grid-cols-1")}>
             {fields.map((item, index) => (
-              <div
-                key={item.id}
-                className="w-full bg-white flex border-2 border-gray-100 rounded-lg py-2 divide-x shadow"
-              >
+              <div key={item.id} className="w-full bg-white flex border-2 border-gray-100 rounded-lg py-2 divide-x shadow">
                 <div className="flex flex-col items-center gap-3 px-3 py-1">
                   <PrinterIcon className="size-6" />
                   <span
@@ -211,10 +196,7 @@ const PrintFormPage = () => {
                   </span>
                 </div>
 
-                <div
-                  key={item.id}
-                  className="flex-grow space-y-5 px-10 py-4 m-auto"
-                >
+                <div key={item.id} className="flex-grow space-y-5 px-10 py-4 m-auto">
                   <InputGroup
                     register={register(`batchs.${index}.batchNo`)}
                     label="Batch Number"
@@ -222,12 +204,7 @@ const PrintFormPage = () => {
                     type="text"
                     className="focus:ring-blue-300"
                     errorMessage={errors?.batchs?.[index]?.batchNo?.message}
-                    onChange={(e) =>
-                      setValue(
-                        `batchs.${index}.batchNo`,
-                        e.target.value.toUpperCase()
-                      )
-                    }
+                    onChange={(e) => setValue(`batchs.${index}.batchNo`, e.target.value.toUpperCase())}
                   />
 
                   <InputGroup
@@ -252,9 +229,7 @@ const PrintFormPage = () => {
                     id={`printEstimate-${index}`}
                     type="text"
                     className="focus:ring-blue-300"
-                    errorMessage={
-                      errors?.batchs?.[index]?.printEstimate?.message
-                    }
+                    errorMessage={errors?.batchs?.[index]?.printEstimate?.message}
                   />
                 </div>
               </div>
