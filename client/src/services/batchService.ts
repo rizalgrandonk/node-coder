@@ -8,6 +8,7 @@ type StartBatchRequest = {
     printEstimate: number;
     productId: number;
     productName: string;
+    markingPrinterId: number;
   }[];
 };
 

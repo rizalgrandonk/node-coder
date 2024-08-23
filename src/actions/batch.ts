@@ -1,6 +1,10 @@
 import { z } from "zod";
 import * as BatchService from "../services/batch";
-import { createBatch, getBatchByBatchNoAndProductId, findById } from "../services/batch";
+import {
+  createBatch,
+  getBatchByBatchNoAndProductId,
+  findById,
+} from "../services/batch";
 import { createUserActivity } from "../services/useractivity";
 import { getProductById } from "../services/product";
 import { getAvailableUniquecodes } from "../services/uniquecodes";
@@ -13,6 +17,7 @@ const startBatchSchema = z.object({
       barcode: z.string().min(1),
       printEstimate: z.number().gt(0),
       productId: z.number(),
+      markingPrinterId: z.number(),
     })
     .array()
     .min(1),
@@ -45,7 +50,10 @@ const updateBatchSchema = z.object({
  * @return {Promise<Batch>} A promise that resolves to the started batch.
  * @throws {ApiError} If the batch details are invalid or if the estimate quantity is higher than the available quantity.
  */
-export const startBatch = async (body: any, data: { userId: number; requestIP?: string; userAgent?: string }) => {
+export const startBatch = async (
+  body: any,
+  data: { userId: number; requestIP?: string; userAgent?: string }
+) => {
   const { userId, requestIP, userAgent } = data;
 
   const validate = startBatchSchema.safeParse(body);
@@ -56,7 +64,8 @@ export const startBatch = async (body: any, data: { userId: number; requestIP?: 
   }
 
   // ? Only handle single batch for now
-  const { barcode, batchNo, printEstimate, productId } = validate.data.batchs[0];
+  const { barcode, batchNo, printEstimate, productId, markingPrinterId } =
+    validate.data.batchs[0];
 
   // ? Get available quantity
   const availableQuantity = await getAvailableUniquecodes();
@@ -65,7 +74,10 @@ export const startBatch = async (body: any, data: { userId: number; requestIP?: 
   }
   // ? throw error if estimate is higher than available quantity
   if (availableQuantity < printEstimate) {
-    throw new ApiError(400, `Estimate Quantity Shouldn't higher than Available Quantity(${availableQuantity})`);
+    throw new ApiError(
+      400,
+      `Estimate Quantity Shouldn't higher than Available Quantity(${availableQuantity})`
+    );
   }
 
   // ? Find or create batch
@@ -85,7 +97,7 @@ export const startBatch = async (body: any, data: { userId: number; requestIP?: 
     browser: userAgent,
   });
 
-  return batch;
+  return { ...batch, markingPrinterId };
 };
 
 /**
@@ -137,19 +149,25 @@ export const endBatch = async (body: any) => {
  * @param {number} data.userId - The user ID.
  * @return {object} The found or created batch data.
  */
-const findOrCreateBatch = async (data: { batchNo: string; barcode: string; printEstimate: number; productId: number; userId: number }) => {
+const findOrCreateBatch = async (data: {
+  batchNo: string;
+  barcode: string;
+  printEstimate: number;
+  productId: number;
+  userId: number;
+}) => {
   const { barcode, batchNo, printEstimate, productId, userId } = data;
 
   // ? Check existing batch and return it if exist
-  const existingBatch = await getBatchByBatchNoAndProductId(batchNo, productId);
-  if (!!existingBatch) {
-    const product = await getProductById(existingBatch.productid);
-    if (!product) {
-      throw new ApiError(400, "Product not found");
-    }
+  // const existingBatch = await getBatchByBatchNoAndProductId(batchNo, productId);
+  // if (!!existingBatch) {
+  //   const product = await getProductById(existingBatch.productid);
+  //   if (!product) {
+  //     throw new ApiError(400, "Product not found");
+  //   }
 
-    return { ...existingBatch, product: product };
-  }
+  //   return { ...existingBatch, product: product };
+  // }
 
   // ? Check if product existed
   const product = await getProductById(productId);

@@ -66,16 +66,23 @@ const ModalLookupProduct = ({
         }
       >
         {error && <AlertBanner message={error} onClose={clearError} />}
-        <div className="py-4 min-w-48 text-blueGray-500 text-lg leading-relaxed ">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+
+            handleConfirmButtonClick();
+          }}
+          className="py-4 min-w-48 text-blueGray-500 text-lg leading-relaxed "
+        >
           <InputGroup
             id="lookup-barcode"
             label="BARCODE"
             placeholder="Please Type Product Barcode"
             onChange={(e) => setBarcode(e.target.value)}
             className="focus:ring-blue-300"
-            buttonClass="bg-emerald-600 hover:bg-emerald-500"
+            autoFocus
           />
-        </div>
+        </form>
       </Modal>
     </>
   );

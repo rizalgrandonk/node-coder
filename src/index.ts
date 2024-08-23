@@ -62,11 +62,14 @@ const DBUpdateQueue = new SharedQueue(MAX_QUEUE * 2);
 let databaseThread: Awaited<ReturnType<typeof spawn<DatabaseThread>>>;
 let printerThread: Awaited<ReturnType<typeof spawn<PrinterThread>>>;
 
-let batchInfo: (Batch & { product: Product }) | null = null;
+let batchInfo: (Batch & { product: Product; markingPrinterId: number }) | null =
+  null;
 
 // let printProcess: Promise<void>;
 
-const startBatch = async (info: Batch & { product: Product }) => {
+const startBatch = async (
+  info: Batch & { product: Product; markingPrinterId: number }
+) => {
   batchInfo = info;
 
   printedUpdateCount.set(0);
@@ -309,7 +312,7 @@ app.post("/batch/start", async (req: Request, res) => {
     console.log("/batch/start", req.body);
 
     const userId = 1000000; // ! ONLY FOR TESTING
-
+    // const markingPrinterId = req.body.batchs;
     const batch = await ActionBatch.startBatch(req.body, {
       userId,
       requestIP: req.requestIP,

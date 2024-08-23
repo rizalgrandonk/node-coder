@@ -52,7 +52,9 @@ export const PrintDataProvider: React.FC<{ children: ReactNode }> = ({
   }, []);
 
   useEffect(() => {
-    const batchInfoListener = (val: (Batch & { product: Product }) | null) => {
+    const batchInfoListener = (
+      val: (Batch & { product: Product; markingPrinterId: number }) | null
+    ) => {
       // Log the received data
       console.log("RECEIVED BATCH INFO SOCKET DATA", val);
 
@@ -70,7 +72,7 @@ export const PrintDataProvider: React.FC<{ children: ReactNode }> = ({
           batchId: val.id,
           batchNo: val.batchno ?? "",
           printerLineId: val.printerlineid,
-          markingPrinterId: 0,
+          markingPrinterId: val.markingPrinterId ?? 0,
           quantity: val.qty,
         },
       ]);
