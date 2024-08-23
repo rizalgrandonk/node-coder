@@ -33,6 +33,7 @@ const PrintDashboardPage = () => {
   } = useDashboard();
 
   const [errorList, setErrorList] = useState<string[]>([]);
+  const [isLoadingRequest, setIsLoadingRequest] = useState(false);
 
   useEffect(() => {
     const channel = "printStatus";
@@ -62,16 +63,26 @@ const PrintDashboardPage = () => {
   }, [socketCtx, errorList]);
 
   const onButtonStartPrintClick = async () => {
+    setIsLoadingRequest(true);
+
     console.log("Start Print Clicked");
-    startPrint();
+    setIsPrinting(true);
+    await startPrint();
+
+    setIsLoadingRequest(false);
   };
 
-  const onButtonStopPrintClick = () => {
-    stopPrint();
-    // socketCtx.context.emit("stopPrint");
+  const onButtonStopPrintClick = async () => {
+    setIsLoadingRequest(true);
+
+    await stopPrint();
+
+    setIsLoadingRequest(false);
   };
 
   const onButtonStopBatchClick = async (id: number) => {
+    setIsLoadingRequest(true);
+
     console.log("Stop Batch Clicked", id);
     const stopBatchResult = await stopBatch(id);
     console.log("Stop Batch Result", stopBatchResult);
@@ -79,9 +90,10 @@ const PrintDashboardPage = () => {
       return;
     }
     printDataCtx.clearPrintData();
+
+    setIsLoadingRequest(false);
     navigate("/form");
     console.log("batch stopped");
-    // socketCtx.context.emit("stopBatch");
   };
 
   return (
@@ -189,6 +201,7 @@ const PrintDashboardPage = () => {
                 <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
                   {!isPrinting && (
                     <button
+                      disabled={isLoadingRequest}
                       onClick={onButtonStartPrintClick}
                       className="w-full sm:w-[175px] bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 flex items-center gap-2 justify-center disabled:bg-gray-300"
                     >
@@ -199,6 +212,7 @@ const PrintDashboardPage = () => {
 
                   {isPrinting && (
                     <button
+                      disabled={isLoadingRequest}
                       onClick={onButtonStopPrintClick}
                       className="w-full sm:w-[175px] bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 flex items-center gap-2 justify-center disabled:bg-gray-300"
                     >
@@ -208,7 +222,7 @@ const PrintDashboardPage = () => {
                   )}
 
                   <button
-                    disabled={isPrinting}
+                    disabled={isPrinting || isLoadingRequest}
                     onClick={() => {
                       console.log("Clicked", printData);
                       onButtonStopBatchClick(printData.batchId);
@@ -220,6 +234,7 @@ const PrintDashboardPage = () => {
                   </button>
 
                   <button
+                    disabled={isLoadingRequest}
                     onClick={onButtonStopPrintClick}
                     className="w-full sm:w-[175px] bg-gray-500 text-white border border-gray-300 rounded-md p-2 flex items-center gap-2 justify-center disabled:bg-gray-300"
                   >

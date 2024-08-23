@@ -284,6 +284,7 @@ const run = async () => {
   console.log("PRINTER THREAD RUN");
 
   // Reset Thread State
+  openNozzleAttempt = 0;
   sameMailingStatusCounter = 0;
   lastMailingStatusKey = "";
 
@@ -524,6 +525,8 @@ const handlePrinterStatus = async (printerResponse: string) => {
 
       isPrinting.set(false);
       isPrinterFinished.set(true);
+
+      openNozzleAttempt = 0;
     }
 
     openNozzleAttempt++;

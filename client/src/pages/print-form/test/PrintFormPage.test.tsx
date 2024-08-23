@@ -233,6 +233,46 @@ describe("PrintFormPage", () => {
     );
   });
 
+  it("should display error when Insert Estimate Quantity with alphanumeric", async () => {
+    render(
+      <MemoryRouter>
+        <PrintFormPage />
+      </MemoryRouter>
+    );
+
+    const printEstimateInput = screen.getByTestId("printEstimate-0-input");
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    await userEvent.type(printEstimateInput, "asiughwiujf");
+    await userEvent.click(startBatchButtons);
+
+    const printEstimateInputErrorMessage = screen.getByTestId(
+      "printEstimate-0-inputErrorMessage"
+    );
+    expect(printEstimateInputErrorMessage.textContent).toEqual(
+      "Estimate Quantity is Required and should be numeric value without symbol"
+    );
+  });
+
+  it("should display error when Insert Estimate Quantity with symbol", async () => {
+    render(
+      <MemoryRouter>
+        <PrintFormPage />
+      </MemoryRouter>
+    );
+
+    const printEstimateInput = screen.getByTestId("printEstimate-0-input");
+    const startBatchButtons = screen.getByTestId("startBatch-button");
+    await userEvent.type(printEstimateInput, "+-?:%^");
+    await userEvent.click(startBatchButtons);
+
+    const printEstimateInputErrorMessage = screen.getByTestId(
+      "printEstimate-0-inputErrorMessage"
+    );
+    expect(printEstimateInputErrorMessage.textContent).toEqual(
+      "Estimate Quantity is Required and should be numeric value without symbol"
+    );
+  });
+
   it("should display error when Submit Batch without Input BatchNo", async () => {
     render(
       <MemoryRouter>

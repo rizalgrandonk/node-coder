@@ -34,13 +34,44 @@ const PrintDataSchema = z.object({
           message:
             "Only uppercase alphanumeric characters, dashes (-), and slashes (/) are allowed.",
         }),
+      // printEstimate: z
+      //   .number({
+      //     message:
+      //       "Estimate Quantity is Required and should be numeric value without symbol",
+      //   })
+      //   .int({
+      //     message: "Estimate Quantity should be numeric value without symbol",
+      //   })
+      //   .gte(1)
+      //   .refine(
+      //     (val) => {
+      //       console.log("val int");
+      //       console.log("val", String);
+      //       console.log(
+      //         "val ken",
+      //         val,
+      //         val.toString().includes(".") && !val.toString().endsWith(".0")
+      //       );
+      //       return !val.toString().includes(".");
+      //     },
+      //     {
+      //       message: "Estimate Quantity should be numeric value symbol (.)",
+      //     }
+      //   ),
       printEstimate: z
-        .number({
-          message:
-            "Estimate Quantity is Required and should be numeric value without symbol",
+        .string()
+        .regex(/^[0-9]+$/, {
+          message: "Estimate Quantity should be numeric value without symbol",
         })
-        .int("Estimate Quantity should be numeric value without symbol")
-        .gte(1),
+        .pipe(
+          z.coerce
+            .number()
+            .int({
+              message:
+                "Estimate Quantity should be numeric value without symbol",
+            })
+            .gte(1)
+        ),
       barcode: z.string().min(1),
       productName: z.string().min(1, { message: "Product is Required" }),
       productId: z.number().gte(1),
@@ -249,9 +280,7 @@ const PrintFormPage = () => {
                   />
 
                   <InputGroup
-                    register={register(`batchs.${index}.printEstimate`, {
-                      valueAsNumber: true,
-                    })}
+                    register={register(`batchs.${index}.printEstimate`)}
                     label="Estimate Quantity"
                     id={`printEstimate-${index}`}
                     type="text"

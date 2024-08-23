@@ -17,7 +17,7 @@ describe("ModalLookupProduct", () => {
     });
   });
 
-  it("should render all elemewnt of ModalLookupProduct", async () => {
+  it("should render all element of ModalLookupProduct", async () => {
     const mockOnClose = vi.fn();
     const mockOnSubmit = vi.fn();
 
